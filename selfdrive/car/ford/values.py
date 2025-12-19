@@ -50,6 +50,7 @@ class CAR:
   EXPLORER_MK6 = "FORD EXPLORER 6TH GEN"
   FOCUS_MK4 = "FORD FOCUS 4TH GEN"
   MAVERICK_MK1 = "FORD MAVERICK 1ST GEN"
+  FORD_F_150_LIGHTNING_MK1 = "FORD F-150 LIGHTNING 1ST GEN"
 
 
 CANFD_CARS: Set[str] = set()
@@ -58,6 +59,8 @@ CANFD_CARS: Set[str] = set()
 class RADAR:
   DELPHI_ESR = 'ford_fusion_2018_adas'
   DELPHI_MRR = 'FORD_CADS'
+  DELPHI_MRR_64 = 'FORD_CADS_64'
+  STEER_ASSIST_DATA = 'ford_lincoln_base_pt'
 
 
 DBC: Dict[str, Dict[str, str]] = defaultdict(lambda: dbc_dict("ford_lincoln_base_pt", RADAR.DELPHI_MRR))
@@ -69,7 +72,7 @@ class FordCarInfo(CarInfo):
   car_parts: CarParts = CarParts.common([CarPart.ford_q3])
 
   def init_make(self, CP: car.CarParams):
-    if CP.carFingerprint in (CAR.BRONCO_SPORT_MK1, CAR.MAVERICK_MK1):
+    if CP.carFingerprint in (CAR.BRONCO_SPORT_MK1, CAR.MAVERICK_MK1, CAR.FORD_F_150_LIGHTNING_MK1):
       self.car_parts = CarParts.common([CarPart.ford_q3, CarPart.angled_mount], remove=[CarPart.mount])
 
 
@@ -85,6 +88,7 @@ CAR_INFO: Dict[str, Union[CarInfo, List[CarInfo]]] = {
   ],
   CAR.FOCUS_MK4: FordCarInfo("Ford Focus EU 2018", "Adaptive Cruise Control with Lane Centering"),
   CAR.MAVERICK_MK1: FordCarInfo("Ford Maverick 2022-23", "Co-Pilot360 Assist"),
+  CAR.FORD_F_150_LIGHTNING_MK1: FordCarInfo("Ford F-150 Lightning 2022-23", "Co-Pilot360 Assist 2.0"),
 }
 
 FW_QUERY_CONFIG = FwQueryConfig(
@@ -238,6 +242,34 @@ FW_VERSIONS = {
     ],
     (Ecu.shiftByWire, 0x732, None): [
       b'NZ6P-14G395-AD\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+  },
+  CAR.FORD_F_150_LIGHTNING_MK1: {
+  	(Ecu.eps, 0x730, None): [
+      b"NL38-14D003-AA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"NL38-14D003-AC\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"RL38-14D003-AA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+    ],
+    (Ecu.abs, 0x760, None): [
+      b'NL38-2D053-AF\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'PL38-2D053-AA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'RL38-2D053-BC\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+	    b'RL38-2D053-BD\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.fwdCamera, 0x706, None): [
+      b"ML3T-14H102\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"PJ6T-14H102\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"PJ8T-14H102\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"RJ6T-14H102\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"RJ8T-14H102\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+    ],
+    (Ecu.fwdRadar, 0x764, None): [
+      b"ML3T-14D049-AH\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      b"ML3T-14D049-AL\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+    ],
+    (Ecu.hud, 0x720, None): [
+      b"NU5T-10F906\x00\x00\x00\x00\x00\x00\x00\x00\x00",
+      # b'NU5T-10F906-FCC\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
 }

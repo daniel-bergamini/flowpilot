@@ -56,6 +56,11 @@ class CarInterface(CarInterfaceBase):
       ret.steerRatio = 17.0
       ret.mass = 1650 + STD_CARGO_KG
 
+    elif candidate == CAR.FORD_F_150_LIGHTNING_MK1:
+      ret.wheelbase = 3.70
+      ret.steerRatio = 16.9
+      ret.mass = 2948 + STD_CARGO_KG
+
     else:
       raise ValueError(f"Unsupported car: {candidate}")
 
