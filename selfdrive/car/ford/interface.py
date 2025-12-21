@@ -98,8 +98,4 @@ class CarInterface(CarInterfaceBase):
 
   # def apply(self, c, now_nanos):
   def apply(self, c, sm, now_nanos):
-    try:
-      CS = sm['carState'] if isinstance(sm, dict) or hasattr(sm, '__getitem__') else sm.carState
-      return self.CC.update(c, self.CS, sm, now_nanos)
-    except TypeError:
-      return self.CC.update(c, self.CS, now_nanos)
+    return self.CC.update(c, sm, self.CS, now_nanos)
