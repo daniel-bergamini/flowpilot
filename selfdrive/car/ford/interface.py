@@ -98,4 +98,7 @@ class CarInterface(CarInterfaceBase):
 
   # def apply(self, c, now_nanos):
   def apply(self, c, sm, now_nanos):
-    return self.CC.update(c, self.CS, now_nanos)
+    try:
+      return self.CC.update(c, self.CS, sm, now_nanos)
+    except TypeError:
+      return self.CC.update(c, self.CS, now_nanos)
