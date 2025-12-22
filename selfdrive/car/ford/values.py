@@ -53,7 +53,9 @@ class CAR:
   FORD_F_150_LIGHTNING_MK1 = "FORD F-150 LIGHTNING 1ST GEN"
 
 
-CANFD_CARS: Set[str] = set()
+CANFD_CARS: Set[str] = {
+  CAR.FORD_F_150_LIGHTNING_MK1,
+}
 
 
 class RADAR:
