@@ -75,6 +75,8 @@ class CarInterface(CarInterfaceBase):
     # BSM: Side_Detect_L_Stat, Side_Detect_R_Stat
     # TODO: detect bsm in car_fw?
     ret.enableBsm = 0x3A6 in fingerprint[0] and 0x3A7 in fingerprint[0]
+    if candidate == CAR.FORD_F_150_LIGHTNING_MK1:
+      ret.enableBsm = False
 
     # LCA can steer down to zero
     ret.minSteerSpeed = 0.
