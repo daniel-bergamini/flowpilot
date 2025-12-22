@@ -3,7 +3,7 @@ from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
 from selfdrive.car import STD_CARGO_KG, get_safety_config
-from selfdrive.car.ford.values import CAR, Ecu
+from selfdrive.car.ford.values import CAR, Ecu, CANFD_CARS
 from selfdrive.car.interfaces import CarInterfaceBase
 
 TransmissionType = car.CarParams.TransmissionType
@@ -15,6 +15,8 @@ class CarInterface(CarInterfaceBase):
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "ford"
     ret.safetyConfigs = [get_safety_config(car.CarParams.SafetyModel.ford)]
+    if candidate in CANFD_CARS:
+      ret.safetyConfigs[0].safetyParam |= Panda.FLAG_FORD_CANFD
 
     # These cars are dashcam only for lack of test coverage.
     # Once a user confirms each car works and a test route is
