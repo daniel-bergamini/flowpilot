@@ -1,4 +1,5 @@
 from cereal import car
+from common.logger import sLogger
 from common.numpy_fast import clip
 from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_angle_limits
@@ -110,4 +111,7 @@ class CarController:
     new_actuators.curvature = self.apply_curvature_last
 
     self.frame += 1
+    if (self.frame % 10) == 0:
+      # Send a debug heartbeat so the Android UI doesn't show "System Unresponsive".
+      sLogger.Send("0ford cc ok")
     return new_actuators, can_sends
