@@ -6,4 +6,7 @@ cd flowpilot
 git pull
 git lfs pull
 
+export LOGPRINT=debug
+export LOGLEVEL=debug
+
 ./launch_flowpilot_full.sh
