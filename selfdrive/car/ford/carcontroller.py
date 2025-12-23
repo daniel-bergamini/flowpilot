@@ -5,7 +5,8 @@ from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_angle_limits
 from selfdrive.car.ford.fordcan import create_acc_msg, create_acc_ui_msg, create_button_msg, create_lat_ctl_msg, \
   create_lat_ctl2_msg, create_lka_msg, create_lkas_ui_msg
-from selfdrive.car.ford.values import CANBUS, CANFD_CARS, CarControllerParams
+from selfdrive.car.ford.helpers import compute_dm_msg_values
+from selfdrive.car.ford.values import CANBUS, CANFD_CARS, CarControllerParams, FordConfig
 
 # Limit lateral acceleration for CAN-FD platforms to avoid aggressive curvature on banked roads.
 EARTH_G = 9.81
@@ -49,6 +50,10 @@ class CarController:
     self.main_on_last = False
     self.lkas_enabled_last = False
     self.steer_alert_last = False
+    self.send_hands_free_cluster_msg = FordConfig.BLUECRUISE_CLUSTER_PRESENT
+    self.tja_msg = 0
+    self.tja_warn = 0
+    self.hands = 0
 
   def update(self, CC, sm, CS, now_nanos):
     can_sends = []
@@ -113,15 +118,28 @@ class CarController:
       can_sends.append(create_acc_msg(self.packer, CC.longActive, gas, accel, stopping))
 
     ### ui ###
+    dm_state = None
+    try:
+      dm_state = sm['driverMonitoringState']
+    except Exception:
+      dm_state = None
+    self.tja_msg, self.tja_warn, self.hands = compute_dm_msg_values(
+      dm_state, hud_control, self.send_hands_free_cluster_msg, main_on, CS.out.cruiseState.standstill
+    )
+    if steer_alert:
+      self.hands = 1
+    elif not self.send_hands_free_cluster_msg:
+      self.hands = 0
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)
     # send lkas ui msg at 1Hz or if ui state changes
     if (self.frame % CarControllerParams.LKAS_UI_STEP) == 0 or send_ui:
-      can_sends.append(create_lkas_ui_msg(self.packer, main_on, CC.latActive, steer_alert, hud_control, CS.lkas_status_stock_values))
+      can_sends.append(create_lkas_ui_msg(self.packer, main_on, CC.latActive, self.hands, hud_control, CS.lkas_status_stock_values))
     # send acc ui msg at 5Hz or if ui state changes
     if (self.frame % CarControllerParams.ACC_UI_STEP) == 0 or send_ui:
       can_sends.append(create_acc_ui_msg(self.packer, self.CP, main_on, CC.latActive,
                                          CS.out.cruiseState.standstill, hud_control,
-                                         CS.acc_tja_status_stock_values))
+                                         CS.acc_tja_status_stock_values, self.send_hands_free_cluster_msg,
+                                         self.tja_warn, self.tja_msg))
 
     self.main_on_last = main_on
     self.lkas_enabled_last = CC.latActive

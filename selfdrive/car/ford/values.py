@@ -58,6 +58,10 @@ CANFD_CARS: Set[str] = {
 }
 
 
+class FordConfig:
+  BLUECRUISE_CLUSTER_PRESENT = False
+
+
 class RADAR:
   DELPHI_ESR = 'ford_fusion_2018_adas'
   DELPHI_MRR = 'FORD_CADS'

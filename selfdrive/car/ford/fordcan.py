@@ -128,7 +128,7 @@ def create_acc_msg(packer, long_active: bool, gas: float, accel: float, stopping
 
 
 def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool, hud_control,
-                      stock_values: dict):
+                      stock_values: dict, send_hands_free_msg: bool = False, tja_warn: int = 0, tja_msg: int = 0):
   """
   Creates a CAN message for the Ford IPC adaptive cruise, forward collision warning and traffic jam
   assist status.
@@ -144,6 +144,8 @@ def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool
       status = 3  # ActiveInterventionLeft
     elif hud_control.rightLaneDepart:
       status = 4  # ActiveInterventionRight
+    elif send_hands_free_msg:
+      status = 7  # Show hands-free UI
     else:
       status = 2  # Active
   elif main_on:
@@ -153,8 +155,10 @@ def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool
       status = 6  # ActiveWarningRight
     else:
       status = 1  # Standby
+  elif standstill:
+    status = 0  # Off
   else:
-    status = 0    # Off
+    status = 1    # Standby
 
   values = {s: stock_values[s] for s in [
     "HaDsply_No_Cs",
@@ -162,8 +166,6 @@ def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool
     "AccStopStat_D_Dsply",       # ACC stopped status message
     "AccTrgDist2_D_Dsply",       # ACC target distance
     "AccStopRes_B_Dsply",
-    "TjaWarn_D_Rq",              # TJA warning
-    "TjaMsgTxt_D_Dsply",         # TJA text
     "IaccLamp_D_Rq",             # iACC status icon
     "AccMsgTxt_D2_Rq",           # ACC text
     "FcwDeny_B_Dsply",           # FCW disabled
@@ -186,6 +188,8 @@ def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool
 
   values.update({
     "Tja_D_Stat": status,        # TJA status
+    "TjaWarn_D_Rq": tja_warn,    # TJA warning
+    "TjaMsgTxt_D_Dsply": tja_msg,  # TJA text
   })
 
   if CP.openpilotLongitudinalControl:
@@ -202,7 +206,7 @@ def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool
   return packer.make_can_msg("ACCDATA_3", CANBUS.main, values)
 
 
-def create_lkas_ui_msg(packer, main_on: bool, enabled: bool, steer_alert: bool, hud_control, stock_values: dict):
+def create_lkas_ui_msg(packer, main_on: bool, enabled: bool, hands: int, hud_control, stock_values: dict):
   """
   Creates a CAN message for the Ford IPC IPMA/LKAS status.
 
@@ -243,8 +247,6 @@ def create_lkas_ui_msg(packer, main_on: bool, enabled: bool, steer_alert: bool, 
     else:
       lines = 30  # LA_Off
 
-  hands_on_wheel_dsply = 1 if steer_alert else 0
-
   values = {s: stock_values[s] for s in [
     "FeatConfigIpmaActl",
     "FeatNoIpmaActl",
@@ -263,7 +265,7 @@ def create_lkas_ui_msg(packer, main_on: bool, enabled: bool, steer_alert: bool, 
 
   values.update({
     "LaActvStats_D_Dsply": lines,                 # LKAS status (lines) [0|31]
-    "LaHandsOff_D_Dsply": hands_on_wheel_dsply,   # 0=HandsOn, 1=Level1 (w/o chime), 2=Level2 (w/ chime), 3=Suppressed
+    "LaHandsOff_D_Dsply": hands,                  # 0=HandsOn, 1=Level1 (w/o chime), 2=Level2 (w/ chime), 3=Suppressed
   })
   return packer.make_can_msg("IPMA_Data", CANBUS.main, values)
 
