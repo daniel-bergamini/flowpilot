@@ -7,11 +7,16 @@ from selfdrive.car.ford.fordcan import create_acc_msg, create_acc_ui_msg, create
   create_lat_ctl2_msg, create_lka_msg, create_lkas_ui_msg
 from selfdrive.car.ford.values import CANBUS, CANFD_CARS, CarControllerParams
 
+# Limit lateral acceleration for CAN-FD platforms to avoid aggressive curvature on banked roads.
+EARTH_G = 9.81
+AVERAGE_ROAD_ROLL = 0.06  # ~3.4 degrees
+MAX_LATERAL_ACCEL = 3.0 - (EARTH_G * AVERAGE_ROAD_ROLL)
+
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 
 
-def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw):
+def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, is_canfd):
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature = clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
@@ -20,7 +25,14 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, CarControllerParams)
 
-  return clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
+  apply_curvature = clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
+
+  if is_canfd:
+    # Conservative max lateral accel limit for CAN-FD platforms.
+    curvature_accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1.0) ** 2)
+    apply_curvature = clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit)
+
+  return apply_curvature
 
 
 class CarController:
@@ -62,7 +74,8 @@ class CarController:
       if CC.latActive:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
-        apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
+        apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
+                                                      CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS)
       else:
         apply_curvature = 0.
 
