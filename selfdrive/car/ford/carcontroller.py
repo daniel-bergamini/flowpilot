@@ -1,8 +1,10 @@
+import math
 from cereal import car
 from common.logger import sLogger
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
+from common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
-from selfdrive.car import apply_std_steer_angle_limits
+from selfdrive.car import apply_hysteresis, apply_std_steer_angle_limits
 from selfdrive.car.ford.fordcan import create_acc_msg, create_acc_ui_msg, create_button_msg, create_lat_ctl_msg, \
   create_lat_ctl2_msg, create_lka_msg, create_lkas_ui_msg
 from selfdrive.car.ford.values import CANBUS, CANFD_CARS, CarControllerParams
@@ -38,6 +40,21 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
   return apply_curvature
 
 
+def anti_overshoot(apply_curvature, apply_curvature_last, v_ego):
+  diff = 0.1
+  tau = 5.0
+  dt = DT_CTRL * CarControllerParams.STEER_STEP
+  alpha = 1.0 - math.exp(-dt / tau)
+
+  lataccel = apply_curvature * (v_ego ** 2)
+  last_lataccel = apply_curvature_last * (v_ego ** 2)
+  last_lataccel = apply_hysteresis(lataccel, last_lataccel, diff)
+  last_lataccel = alpha * lataccel + (1.0 - alpha) * last_lataccel
+
+  output_curvature = last_lataccel / (max(v_ego, 1.0) ** 2)
+  return float(interp(v_ego, [5.0, 10.0], [apply_curvature, output_curvature]))
+
+
 class CarController:
   def __init__(self, dbc_name, CP, VM):
     self.CP = CP
@@ -46,6 +63,9 @@ class CarController:
     self.frame = 0
 
     self.apply_curvature_last = 0
+    self.anti_overshoot_curvature_last = 0.0
+    self.post_reset_ramp_active = False
+    self.reset_steering_last = False
     self.main_on_last = False
     self.lkas_enabled_last = False
     self.steer_alert_last = False
@@ -80,11 +100,34 @@ class CarController:
         lane_line_bias = 0.0
         if CC.latActive and not sm['lateralPlan'].useLaneLines:
           lane_line_bias = -RIGHT_EDGE_BIAS_CURVATURE
-        apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
-                                                      CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
-                                                      bias=lane_line_bias)
+        requested_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
+                                                          CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
+                                                          bias=lane_line_bias)
+        reset_steering = CS.steeringPressed
+        if reset_steering:
+          self.post_reset_ramp_active = False
+          self.anti_overshoot_curvature_last = 0.0
+          apply_curvature = 0.0
+        else:
+          if self.reset_steering_last and not reset_steering:
+            self.post_reset_ramp_active = True
+            self.apply_curvature_last = 0.0
+
+          if self.post_reset_ramp_active:
+            # Ramp back in after driver steering to avoid snap back.
+            apply_curvature = apply_std_steer_angle_limits(requested_curvature, self.apply_curvature_last,
+                                                           CS.out.vEgoRaw, CarControllerParams)
+            if abs(apply_curvature - requested_curvature) < max(0.001, 0.1 * abs(requested_curvature)):
+              self.post_reset_ramp_active = False
+          else:
+            self.anti_overshoot_curvature_last = anti_overshoot(requested_curvature,
+                                                                self.anti_overshoot_curvature_last,
+                                                                CS.out.vEgoRaw)
+            apply_curvature = self.anti_overshoot_curvature_last
+        self.reset_steering_last = reset_steering
       else:
         apply_curvature = 0.
+        self.post_reset_ramp_active = False
 
       self.apply_curvature_last = apply_curvature
 
