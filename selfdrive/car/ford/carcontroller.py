@@ -11,12 +11,14 @@ from selfdrive.car.ford.values import CANBUS, CANFD_CARS, CarControllerParams
 EARTH_G = 9.81
 AVERAGE_ROAD_ROLL = 0.06  # ~3.4 degrees
 MAX_LATERAL_ACCEL = 3.0 - (EARTH_G * AVERAGE_ROAD_ROLL)
+# Small right-bias when lane lines are not trusted to avoid centering on unlined roads.
+RIGHT_EDGE_BIAS_CURVATURE = 0.0003
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 
 
-def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, is_canfd):
+def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, is_canfd, bias=0.0):
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature = clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
@@ -25,6 +27,7 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, CarControllerParams)
 
+  apply_curvature += bias
   apply_curvature = clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
 
   if is_canfd:
@@ -74,8 +77,12 @@ class CarController:
       if CC.latActive:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
+        lane_line_bias = 0.0
+        if CC.latActive and not sm['lateralPlan'].useLaneLines:
+          lane_line_bias = -RIGHT_EDGE_BIAS_CURVATURE
         apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
-                                                      CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS)
+                                                      CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
+                                                      bias=lane_line_bias)
       else:
         apply_curvature = 0.
 
