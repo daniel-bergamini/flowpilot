@@ -1,6 +1,6 @@
 from cereal import car
 from common.logger import sLogger
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
 from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_angle_limits
 from selfdrive.car.ford.fordcan import create_acc_msg, create_acc_ui_msg, create_button_msg, create_lat_ctl_msg, \
@@ -13,6 +13,8 @@ AVERAGE_ROAD_ROLL = 0.06  # ~3.4 degrees
 MAX_LATERAL_ACCEL = 3.0 - (EARTH_G * AVERAGE_ROAD_ROLL)
 # Small right-bias when lane lines are not trusted to avoid centering on unlined roads.
 RIGHT_EDGE_BIAS_CURVATURE = 0.0003
+LANE_CHANGE_FACTOR_BP = [4.4, 40.23]
+LANE_CHANGE_FACTOR_V = [0.95, 0.85]
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -80,7 +82,11 @@ class CarController:
         lane_line_bias = 0.0
         if CC.latActive and not sm['lateralPlan'].useLaneLines:
           lane_line_bias = -RIGHT_EDGE_BIAS_CURVATURE
-        apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
+        requested_curvature = actuators.curvature
+        if sm['lateralPlan'].laneChangeState != 0:
+          lane_change_factor = interp(CS.out.vEgoRaw, LANE_CHANGE_FACTOR_BP, LANE_CHANGE_FACTOR_V)
+          requested_curvature *= lane_change_factor
+        apply_curvature = apply_ford_curvature_limits(requested_curvature, self.apply_curvature_last, current_curvature,
                                                       CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
                                                       bias=lane_line_bias)
       else:
