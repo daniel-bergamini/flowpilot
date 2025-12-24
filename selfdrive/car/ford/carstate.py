@@ -19,7 +19,7 @@ class CarState(CarStateBase):
 
     self.vehicle_sensors_valid = False
     self.hybrid_platform = False
-    self.lc_button = 0
+    self.lc_button = False
 
   def update(self, cp, cp_cam):
     ret = car.CarState.new_message()
@@ -85,11 +85,14 @@ class CarState(CarStateBase):
     ret.leftBlinker = cp.vl["Steering_Data_FD1"]["TurnLghtSwtch_D_Stat"] == 1
     ret.rightBlinker = cp.vl["Steering_Data_FD1"]["TurnLghtSwtch_D_Stat"] == 2
     # TODO: block this going to the camera otherwise it will enable stock TJA
-    ret.genericToggle = bool(cp.vl["Steering_Data_FD1"]["TjaButtnOnOffPress"])
     prev_lc_button = self.lc_button
-    self.lc_button = int(ret.genericToggle)
+    self.lc_button = bool(cp.vl["Steering_Data_FD1"]["TjaButtnOnOffPress"])
+    ret.genericToggle = self.lc_button
     if self.lc_button != prev_lc_button:
-      ret.buttonEvents = [create_button_event(self.lc_button, prev_lc_button, {1: ButtonType.lkas})]
+      # Flowpilot doesn't have a dedicated LKAS button enum; map to altButton1.
+      ret.buttonEvents = [
+        create_button_event(int(self.lc_button), int(prev_lc_button), {1: ButtonType.altButton1})
+      ]
 
     # lock info
     ret.doorOpen = any([cp.vl["BodyInfo_3_FD1"]["DrStatDrv_B_Actl"], cp.vl["BodyInfo_3_FD1"]["DrStatPsngr_B_Actl"],
