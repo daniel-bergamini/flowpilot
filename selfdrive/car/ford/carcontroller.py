@@ -80,11 +80,19 @@ class CarController:
         lane_line_bias = 0.0
         if CC.latActive and not sm['lateralPlan'].useLaneLines:
           lane_line_bias = -RIGHT_EDGE_BIAS_CURVATURE
+        desired_curvature_rate = 0.0
+        try:
+          desired_curvature_rate = float(sm['controlsState'].desiredCurvatureRate)
+        except Exception:
+          desired_curvature_rate = 0.0
+        desired_curvature_rate = clip(desired_curvature_rate, -0.001023, 0.001023)
+
         apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
                                                       CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
                                                       bias=lane_line_bias)
       else:
         apply_curvature = 0.
+        desired_curvature_rate = 0.0
 
       self.apply_curvature_last = apply_curvature
 
@@ -92,9 +100,9 @@ class CarController:
         # TODO: extended mode
         mode = 1 if CC.latActive else 0
         counter = (self.frame // CarControllerParams.STEER_STEP) % 0x10
-        can_sends.append(create_lat_ctl2_msg(self.packer, mode, 0., 0., -apply_curvature, 0., counter))
+        can_sends.append(create_lat_ctl2_msg(self.packer, mode, 0., 0., -apply_curvature, -desired_curvature_rate, counter))
       else:
-        can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, 0., 0., -apply_curvature, 0.))
+        can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, 0., 0., -apply_curvature, -desired_curvature_rate))
 
     # send lka msg at 33Hz
     if (self.frame % CarControllerParams.LKA_STEP) == 0:
