@@ -9,4 +9,6 @@ git lfs pull
 export LOGPRINT=debug
 export LOGLEVEL=debug
 
+git branch stable
+
 ./launch_flowpilot_full.sh
