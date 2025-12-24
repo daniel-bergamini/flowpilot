@@ -1,11 +1,12 @@
 from cereal import car
 from common.logger import sLogger
-from common.numpy_fast import clip
+from common.numpy_fast import clip, interp
 from opendbc.can.packer import CANPacker
 from selfdrive.car import apply_std_steer_angle_limits
 from selfdrive.car.ford.fordcan import create_acc_msg, create_acc_ui_msg, create_button_msg, create_lat_ctl_msg, \
   create_lat_ctl2_msg, create_lka_msg, create_lkas_ui_msg
 from selfdrive.car.ford.values import CANBUS, CANFD_CARS, CarControllerParams
+from selfdrive.modeld.constants import T_IDXS
 
 # Limit lateral acceleration for CAN-FD platforms to avoid aggressive curvature on banked roads.
 EARTH_G = 9.81
@@ -13,6 +14,10 @@ AVERAGE_ROAD_ROLL = 0.06  # ~3.4 degrees
 MAX_LATERAL_ACCEL = 3.0 - (EARTH_G * AVERAGE_ROAD_ROLL)
 # Small right-bias when lane lines are not trusted to avoid centering on unlined roads.
 RIGHT_EDGE_BIAS_CURVATURE = 0.0003
+PATH_OFFSET_LOOKAHEAD = 0.2
+PATH_OFFSET_MAX = 2.0
+PATH_ANGLE_MAX = 0.5
+LANE_CONFIDENCE_BP = [0.6, 0.8]
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -80,11 +85,43 @@ class CarController:
         lane_line_bias = 0.0
         if CC.latActive and not sm['lateralPlan'].useLaneLines:
           lane_line_bias = -RIGHT_EDGE_BIAS_CURVATURE
+        desired_curvature_rate = 0.0
+        path_offset = 0.0
+        path_angle = 0.0
+        try:
+          desired_curvature_rate = float(sm['controlsState'].desiredCurvatureRate)
+        except Exception:
+          desired_curvature_rate = 0.0
+        desired_curvature_rate = clip(desired_curvature_rate, -0.001023, 0.001023)
+
+        try:
+          model = sm['modelV2']
+          path_offset_position = interp(PATH_OFFSET_LOOKAHEAD, T_IDXS, model.position.y)
+          path_offset_lanelines = (model.laneLines[1].y[0] + model.laneLines[2].y[0]) / 2
+          laneline_confidence = min(model.laneLineProbs[1], model.laneLineProbs[2])
+          laneline_scale = interp(laneline_confidence, LANE_CONFIDENCE_BP, [0.0, 1.0])
+          if not sm['lateralPlan'].useLaneLines:
+            laneline_scale = 0.0
+          path_offset = (path_offset_position * (1.0 - laneline_scale)) + (path_offset_lanelines * laneline_scale)
+          if sm['lateralPlan'].laneChangeState != 0:
+            path_offset = 0.0
+        except Exception:
+          path_offset = 0.0
+        path_offset = clip(path_offset, -PATH_OFFSET_MAX, PATH_OFFSET_MAX)
+
+        try:
+          path_angle = float(sm['lateralPlan'].psis[0])
+        except Exception:
+          path_angle = 0.0
+        path_angle = clip(path_angle, -PATH_ANGLE_MAX, PATH_ANGLE_MAX)
         apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature,
                                                       CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
                                                       bias=lane_line_bias)
       else:
         apply_curvature = 0.
+        desired_curvature_rate = 0.0
+        path_offset = 0.0
+        path_angle = 0.0
 
       self.apply_curvature_last = apply_curvature
 
@@ -92,9 +129,11 @@ class CarController:
         # TODO: extended mode
         mode = 1 if CC.latActive else 0
         counter = (self.frame // CarControllerParams.STEER_STEP) % 0x10
-        can_sends.append(create_lat_ctl2_msg(self.packer, mode, 0., 0., -apply_curvature, 0., counter))
+        can_sends.append(create_lat_ctl2_msg(self.packer, mode, -path_offset, -path_angle,
+                                             -apply_curvature, -desired_curvature_rate, counter))
       else:
-        can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, 0., 0., -apply_curvature, 0.))
+        can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, -path_offset, -path_angle,
+                                            -apply_curvature, -desired_curvature_rate))
 
     # send lka msg at 33Hz
     if (self.frame % CarControllerParams.LKA_STEP) == 0:
