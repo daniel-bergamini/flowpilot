@@ -154,7 +154,7 @@ class CarController:
         requested_curvature = apply_ford_curvature_limits(requested_curvature, self.apply_curvature_last, current_curvature,
                                                           CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
                                                           bias=lane_line_bias)
-        reset_steering = CS.steeringPressed
+    reset_steering = CS.out.steeringPressed
         if reset_steering:
           self.post_reset_ramp_active = False
           self.anti_overshoot_curvature_last = 0.0
