@@ -245,23 +245,27 @@ def _get_named_refs(ref_root: str, label: str):
 
 
 def _get_recent_branches() -> list:
-    refs = _get_named_refs("refs/remotes/origin", "branch")
-    source_prefix = "origin/"
-    if not refs:
-        refs = _get_named_refs("refs/heads", "branch")
-        source_prefix = ""
-
     branches = []
-    for ref in refs:
+    seen = set()
+
+    def add_ref(ref, source_prefix):
         name = ref.get("value") or ""
         if name.endswith("/HEAD"):
-            continue
+            return
         display = name.replace(source_prefix, "") if source_prefix else name
+        if not display or display in seen:
+            return
         label = f"{display} ({ref.get('date', '')} {ref.get('short', '')})".strip()
         branches.append({
             "value": name,
             "label": label,
         })
+        seen.add(display)
+
+    for ref in _get_named_refs("refs/remotes/origin", "branch"):
+        add_ref(ref, "origin/")
+    for ref in _get_named_refs("refs/heads", "branch"):
+        add_ref(ref, "")
 
     if not branches:
         result = subprocess.run(
@@ -328,24 +332,24 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
         commits = _get_recent_commits(_get_default_remote_ref() or "HEAD")
 
     head = _current_git_head()
-    options = []
+    commit_options = []
     for commit in commits:
         option = {"name": commit["label"], "value": commit["value"]}
         if head and commit["value"] == head:
             option["default"] = True
-        options.append(option)
+        commit_options.append(option)
     for group in panel_data.get("groups", []):
         for control in group.get("controls", []):
             if control.get("type") == "selection" and control.get("param") == FLOWPILOT_BRANCH_PARAM:
-                options = []
+                branch_selection = []
                 for ref in branch_options:
                     entry = {"name": ref["label"], "value": ref["value"]}
                     if branch_ref and ref["value"] == branch_ref:
                         entry["default"] = True
-                    options.append(entry)
-                control["options"] = options
+                    branch_selection.append(entry)
+                control["options"] = branch_selection
             if control.get("type") == "selection" and control.get("param") == FLOWPILOT_TARGET_PARAM:
-                control["options"] = options
+                control["options"] = commit_options
     return panel_data
 
 
