@@ -56,7 +56,7 @@ const getPanelIcon = (panelId?: string) => {
 export function SettingsView({ deviceStatus: _deviceStatus }: SettingsViewProps) {
   const { panels, loadedPanels, loading, error, fetchPanels, fetchPanel } = usePanelsStore()
   const { state, fetchState } = usePanelStateStore()
-  const { fetchParams } = useParamsStore()
+  const { fetchParams, getEffectiveValue } = useParamsStore()
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -200,6 +200,14 @@ export function SettingsView({ deviceStatus: _deviceStatus }: SettingsViewProps)
       fetchPanel(selectedPanelId)
     }
   }, [selectedPanelId, loadedPanels, fetchPanel])
+
+  const flowpilotBranch = getEffectiveValue('FlowpilotTargetBranch')
+
+  useEffect(() => {
+    if (selectedPanelId === 'bp_flowpilot_panel') {
+      fetchPanel('bp_flowpilot_panel', true)
+    }
+  }, [flowpilotBranch, selectedPanelId, fetchPanel])
 
   const selectedPanel = selectedPanelId ? loadedPanels[selectedPanelId] : null
 

@@ -160,9 +160,22 @@ from bluepilot.backend.params.params_manager import Params
 params = Params()
 
 FLOWPILOT_TARGET_PARAM = "FlowpilotTargetRef"
+FLOWPILOT_BRANCH_PARAM = "FlowpilotTargetBranch"
 
 
-def _get_recent_commits(limit: int = 20):
+def _get_default_remote_ref() -> Optional[str]:
+    result = subprocess.run(
+        ["git", "-C", BASEDIR, "symbolic-ref", "--quiet", "refs/remotes/origin/HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    ref = (result.stdout or "").strip()
+    return ref or None
+
+
+def _get_recent_commits(ref: str, limit: int = 20):
     cmd = [
         "git",
         "-C",
@@ -171,6 +184,7 @@ def _get_recent_commits(limit: int = 20):
         f"-n{limit}",
         "--date=short",
         "--pretty=format:%H%x1f%h%x1f%ad%x1f%s",
+        ref,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
@@ -229,6 +243,22 @@ def _get_named_refs(ref_root: str, label: str):
     return refs
 
 
+def _get_recent_branches() -> list:
+    refs = _get_named_refs("refs/remotes/origin", "branch")
+    branches = []
+    for ref in refs:
+        name = ref.get("value") or ""
+        if name.endswith("/HEAD"):
+            continue
+        display = name.replace("origin/", "")
+        label = f"{display} ({ref.get('date', '')} {ref.get('short', '')})".strip()
+        branches.append({
+            "value": name,
+            "label": label,
+        })
+    return branches
+
+
 def _current_git_head():
     result = subprocess.run(
         ["git", "-C", BASEDIR, "rev-parse", "HEAD"],
@@ -253,12 +283,29 @@ def _repo_is_dirty():
 
 def _populate_flowpilot_panel(panel_data: dict) -> dict:
     try:
-        commits = _get_recent_commits()
-        branches = _get_named_refs("refs/heads", "branch")
-        tags = _get_named_refs("refs/tags", "tag")
+        branch_options = _get_recent_branches()
     except Exception as exc:
         logger.warning("Failed to load recent commits: %s", exc)
         return panel_data
+
+    branch_ref = None
+    try:
+        branch_bytes = params.get(FLOWPILOT_BRANCH_PARAM)
+        if isinstance(branch_bytes, bytes):
+            branch_ref = branch_bytes.decode('utf-8', errors='replace').strip()
+        elif isinstance(branch_bytes, str):
+            branch_ref = branch_bytes.strip()
+    except Exception:
+        branch_ref = None
+
+    if not branch_ref:
+        branch_ref = _get_default_remote_ref() or "HEAD"
+
+    try:
+        commits = _get_recent_commits(branch_ref)
+    except Exception as exc:
+        logger.warning("Failed to load recent commits for %s: %s", branch_ref, exc)
+        commits = _get_recent_commits(_get_default_remote_ref() or "HEAD")
 
     head = _current_git_head()
     options = []
@@ -267,17 +314,10 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
         if head and commit["value"] == head:
             option["default"] = True
         options.append(option)
-    if branches:
-        options.append({"name": "— Branches —", "value": "", "default": False})
-        for ref in branches:
-            options.append({"name": ref["label"], "value": ref["value"]})
-    if tags:
-        options.append({"name": "— Tags —", "value": "", "default": False})
-        for ref in tags:
-            options.append({"name": ref["label"], "value": ref["value"]})
-
     for group in panel_data.get("groups", []):
         for control in group.get("controls", []):
+            if control.get("type") == "selection" and control.get("param") == FLOWPILOT_BRANCH_PARAM:
+                control["options"] = branch_options
             if control.get("type") == "selection" and control.get("param") == FLOWPILOT_TARGET_PARAM:
                 control["options"] = options
     return panel_data
@@ -1252,7 +1292,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                     # Get latest Flowpilot build info from git
                     try:
-                        commit = _get_recent_commits(limit=1)
+                        commit = _get_recent_commits("HEAD", limit=1)
                         if commit:
                             device_info['fp_build'] = commit[0]["label"]
                         else:

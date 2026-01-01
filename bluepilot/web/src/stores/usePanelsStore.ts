@@ -16,7 +16,7 @@ interface PanelsState {
 
   // Actions
   fetchPanels: () => Promise<void>
-  fetchPanel: (panelId: string) => Promise<void>
+  fetchPanel: (panelId: string, force?: boolean) => Promise<void>
   clearError: () => void
 }
 
@@ -47,9 +47,9 @@ export const usePanelsStore = create<PanelsState>((set, get) => ({
   },
 
   // Fetch specific panel configuration
-  fetchPanel: async (panelId: string) => {
+  fetchPanel: async (panelId: string, force = false) => {
     // Don't re-fetch if already loaded
-    if (get().loadedPanels[panelId]) {
+    if (!force && get().loadedPanels[panelId]) {
       return
     }
 

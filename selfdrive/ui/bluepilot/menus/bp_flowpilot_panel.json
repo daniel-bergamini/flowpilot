@@ -16,7 +16,7 @@
         {
           "type": "command_button",
           "title": "Fetch Updates",
-          "desc": "Refresh commit, branch, and tag lists from remotes.",
+          "desc": "Refresh branch and commit lists from remotes.",
           "button_text": "FETCH",
           "action": "flowpilot_git_sync",
           "confirm": true,
@@ -26,9 +26,16 @@
         },
         {
           "type": "selection",
+          "param": "FlowpilotTargetBranch",
+          "title": "Target Branch",
+          "desc": "Pick a branch (sorted by most recent commit).",
+          "options": []
+        },
+        {
+          "type": "selection",
           "param": "FlowpilotTargetRef",
           "title": "Target Commit",
-          "desc": "Select from the last 20 commits (newest first).",
+          "desc": "Select from the last 20 commits in the selected branch (newest first).",
           "options": []
         },
         {
