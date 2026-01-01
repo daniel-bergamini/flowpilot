@@ -19,7 +19,7 @@ interface SelectionControlProps {
 }
 
 export function SelectionControl({ control, disabled, disabledReason }: SelectionControlProps) {
-  const { params } = useParamsStore()
+  const { params, updateParam } = useParamsStore()
   const panelState = usePanelStateStore((state) => state.state)
   const settingsContext = useSettingsContext()
 
@@ -50,7 +50,12 @@ export function SelectionControl({ control, disabled, disabledReason }: Selectio
   const unit = isMetric && control.unitMetric ? control.unitMetric : control.unit
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    stageValue(e.target.value)
+    const nextValue = e.target.value
+    if (control.param === 'FlowpilotTargetBranch') {
+      updateParam(control.param, nextValue)
+      return
+    }
+    stageValue(nextValue)
   }
 
   return (

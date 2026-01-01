@@ -248,21 +248,8 @@ def _get_recent_branches() -> list:
     branches = []
     seen = set()
 
-    def add_entry(name, short_sha, date_str):
-        if not name or name.endswith("/HEAD"):
-            return
-        display = name.replace("origin/", "")
-        if display in seen:
-            return
-        label = f"{display} ({date_str} {short_sha})".strip()
-        branches.append({
-            "value": name,
-            "label": label,
-        })
-        seen.add(display)
-
     candidates = []
-    def add_candidate(name, short_sha, date_str):
+    def add_candidate(name, short_sha, date_ts, date_str):
         if not name or name.endswith("/HEAD"):
             return
         display = name.replace("origin/", "")
@@ -272,7 +259,7 @@ def _get_recent_branches() -> list:
         candidates.append({
             "value": name,
             "label": f"{display} ({date_str} {short_sha})".strip(),
-            "date": date_str,
+            "date_ts": date_ts,
         })
 
     # Prefer a combined view of remotes + locals
@@ -284,7 +271,7 @@ def _get_recent_branches() -> list:
             "for-each-ref",
             "refs/remotes/origin",
             "refs/heads",
-            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
+            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:unix)%x1f%(committerdate:short)",
         ],
         capture_output=True,
         text=True,
@@ -292,26 +279,14 @@ def _get_recent_branches() -> list:
     if result.returncode == 0:
         for line in result.stdout.splitlines():
             parts = line.split("\x1f")
-            if len(parts) < 2:
+            if len(parts) < 3:
                 continue
-            add_candidate(parts[0], parts[1], parts[2] if len(parts) > 2 else "")
+            date_ts = int(parts[2]) if parts[2].isdigit() else 0
+            date_str = parts[3] if len(parts) > 3 else ""
+            add_candidate(parts[0], parts[1], date_ts, date_str)
 
-    candidates.sort(key=lambda item: item.get("date") or "", reverse=True)
+    candidates.sort(key=lambda item: item.get("date_ts") or 0, reverse=True)
     branches = [{"value": item["value"], "label": item["label"]} for item in candidates]
-
-    # Fallback: explicit local branches
-    if not branches:
-        result = subprocess.run(
-            ["git", "-C", BASEDIR, "branch", "--format=%(refname:short)|%(objectname:short)|%(committerdate:short)"],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode == 0:
-            for line in result.stdout.splitlines():
-                parts = line.split("|")
-                if len(parts) < 2:
-                    continue
-                add_entry(parts[0].strip(), parts[1].strip(), parts[2].strip() if len(parts) > 2 else "")
 
     if not branches:
         result = subprocess.run(
