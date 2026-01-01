@@ -32,6 +32,7 @@ import re
 import asyncio
 import threading
 import requests
+from typing import Optional
 
 try:
     import psutil
