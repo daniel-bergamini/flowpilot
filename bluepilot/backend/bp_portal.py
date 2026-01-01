@@ -271,7 +271,12 @@ def _get_recent_branches() -> list:
         if result.returncode != 0:
             return False
         for line in result.stdout.splitlines():
-            parts = line.split("\x1f")
+            if "\x1f" in line:
+                parts = line.split("\x1f")
+            elif "|" in line:
+                parts = line.split("|")
+            else:
+                parts = [line]
             if len(parts) < 2:
                 continue
             date_str = parts[2] if len(parts) > 2 else ""
@@ -285,7 +290,7 @@ def _get_recent_branches() -> list:
         "branch",
         "-a",
         "--sort=-committerdate",
-        "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
+        "--format=%(refname:short)|%(objectname:short)|%(committerdate:short)",
     ]
     if not read_candidates_from_cmd(branch_cmd):
         branch_cmd = [
@@ -294,7 +299,7 @@ def _get_recent_branches() -> list:
             BASEDIR,
             "branch",
             "-a",
-            "--format=%(refname:short)%x1f%(objectname:short)",
+            "--format=%(refname:short)|%(objectname:short)",
         ]
         read_candidates_from_cmd(branch_cmd)
 
@@ -307,7 +312,7 @@ def _get_recent_branches() -> list:
             "--sort=-committerdate",
             "refs/heads",
             "refs/remotes",
-            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
+            "--format=%(refname:short)|%(objectname:short)|%(committerdate:short)",
         ]
         if not read_candidates_from_cmd(for_each_cmd):
             for_each_cmd = [
@@ -317,7 +322,7 @@ def _get_recent_branches() -> list:
                 "for-each-ref",
                 "refs/heads",
                 "refs/remotes",
-                "--format=%(refname:short)%x1f%(objectname:short)",
+                "--format=%(refname:short)|%(objectname:short)",
             ]
             read_candidates_from_cmd(for_each_cmd)
 
