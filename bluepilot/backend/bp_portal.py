@@ -262,6 +262,20 @@ def _get_recent_branches() -> list:
             "value": name,
             "label": label,
         })
+
+    if not branches:
+        result = subprocess.run(
+            ["git", "-C", BASEDIR, "rev-parse", "--abbrev-ref", "HEAD"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            head = (result.stdout or "").strip()
+            if head:
+                branches.append({
+                    "value": head,
+                    "label": f"{head} (current)",
+                })
     return branches
 
 
@@ -323,7 +337,13 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
     for group in panel_data.get("groups", []):
         for control in group.get("controls", []):
             if control.get("type") == "selection" and control.get("param") == FLOWPILOT_BRANCH_PARAM:
-                control["options"] = branch_options
+                options = []
+                for ref in branch_options:
+                    entry = {"name": ref["label"], "value": ref["value"]}
+                    if branch_ref and ref["value"] == branch_ref:
+                        entry["default"] = True
+                    options.append(entry)
+                control["options"] = options
             if control.get("type") == "selection" and control.get("param") == FLOWPILOT_TARGET_PARAM:
                 control["options"] = options
     return panel_data
