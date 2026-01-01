@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 from collections import deque
 from datetime import datetime
 from typing import Deque, Dict, Optional, Tuple
@@ -178,3 +179,31 @@ def read_recent_manager_logs(max_lines: int = 1000, max_files: int = 25) -> Tupl
         return False, "No manager log entries found"
 
     return True, '\n'.join(lines)
+
+
+def read_tmux_logs(max_lines: int = 2000, target: Optional[str] = None) -> Tuple[bool, str]:
+    """Read recent output from a tmux pane.
+
+    Args:
+        max_lines: number of lines to capture from scrollback
+        target: optional tmux target (session:window.pane)
+    """
+    cmd = ["tmux", "capture-pane", "-pS", f"-{max_lines}"]
+    if target:
+        cmd.extend(["-t", target])
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+    except FileNotFoundError:
+        return False, "tmux not available"
+    except subprocess.TimeoutExpired:
+        return False, "tmux capture timed out"
+
+    if result.returncode != 0:
+        err = (result.stderr or result.stdout or "").strip()
+        return False, err or "tmux capture failed"
+
+    output = result.stdout.strip()
+    if not output:
+        return False, "tmux capture empty"
+    return True, output

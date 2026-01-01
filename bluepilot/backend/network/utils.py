@@ -28,6 +28,9 @@ def is_onroad():
 def should_server_run():
     """Check if server should be running (always runs when enabled, rate-limited onroad)"""
     try:
+        raw = params.get("WebPortalEnabled")
+        if raw is None or raw == b"" or raw == "":
+            return True
         return params.get_bool("WebPortalEnabled")
     except:
         return True  # Default to running if we can't check

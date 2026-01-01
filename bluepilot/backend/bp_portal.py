@@ -133,7 +133,7 @@ from bluepilot.backend.storage import (
 # Log extraction
 from bluepilot.backend.logs import (
     extract_log_messages, extract_cereal_messages,
-    read_recent_manager_logs,
+    read_recent_manager_logs, read_tmux_logs,
 )
 
 # File operations
@@ -1381,17 +1381,32 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     manager_ok = False
                     manager_output = str(exc)
 
+                source = 'swaglog'
+                output = manager_output
+                success = manager_ok
+                error = None
+
+                if not manager_ok:
+                    tmux_target = parse_qs(parsed.query).get('tmux', [''])[0].strip() or None
+                    tmux_ok, tmux_output = read_tmux_logs(target=tmux_target)
+                    if tmux_ok:
+                        source = 'tmux'
+                        output = tmux_output
+                        success = True
+                    else:
+                        error = f"swaglog: {manager_output}; tmux: {tmux_output}"
+
                 payload = {
                     'timestamp': datetime.now().isoformat(),
-                    'output': manager_output,
-                    'source': 'swaglog',
-                    'success': manager_ok,
+                    'output': output,
+                    'source': source,
+                    'success': success,
                 }
 
-                if manager_ok:
+                if success:
                     self.send_json_response(payload)
                 else:
-                    payload['error'] = manager_output
+                    payload['error'] = error or output
                     self.send_json_response(payload, 500)
 
             elif path == '/api/manager-logs/stream/status':
