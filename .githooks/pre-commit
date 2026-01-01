@@ -4,23 +4,74 @@ set -eu
 changed_files="$(git diff --cached --name-only)"
 
 if echo "$changed_files" | grep -qE '^bluepilot/web/(src/|package.json|package-lock.json|tsconfig.*|vite.config.ts)'; then
-  if [ ! -d "bluepilot/web/node_modules" ]; then
-    echo "bluepilot/web/node_modules not found. Run 'npm install' in bluepilot/web first." >&2
-    exit 1
-  fi
+  needs_build=1
+  if command -v python3 >/dev/null 2>&1; then
+    if python3 - <<'PY'
+import os
 
-  if ! command -v npm >/dev/null 2>&1; then
-    if [ -x "/usr/local/opt/node@20/bin/npm" ]; then
-      export PATH="/usr/local/opt/node@20/bin:$PATH"
+root = os.path.join("bluepilot", "web")
+src_root = os.path.join(root, "src")
+build_root = os.path.join(root, "public")
+config_files = [
+    os.path.join(root, "package.json"),
+    os.path.join(root, "package-lock.json"),
+    os.path.join(root, "vite.config.ts"),
+]
+
+def newest_mtime(path):
+    if not os.path.exists(path):
+        return None
+    newest = None
+    for dirpath, _, filenames in os.walk(path):
+        for name in filenames:
+            try:
+                mtime = os.path.getmtime(os.path.join(dirpath, name))
+            except OSError:
+                continue
+            newest = mtime if newest is None else max(newest, mtime)
+    return newest
+
+src_mtime = newest_mtime(src_root)
+build_mtime = newest_mtime(build_root)
+for cfg in config_files:
+    if os.path.exists(cfg):
+        src_mtime = max(src_mtime or 0, os.path.getmtime(cfg))
+
+if not src_mtime or not build_mtime:
+    raise SystemExit(0)  # stale
+if src_mtime > build_mtime:
+    raise SystemExit(0)  # stale
+raise SystemExit(1)  # fresh
+PY
+    then
+      needs_build=1
     else
-      echo "npm not found. Skipping Bluepilot web build." >&2
-      echo "Install Node (e.g., brew install node@20) and re-run the commit to rebuild assets." >&2
-      exit 0
+      needs_build=0
     fi
   fi
 
-  echo "Building Bluepilot web assets..."
-  (cd bluepilot/web && npm run build)
+  if [ "$needs_build" -eq 0 ]; then
+    echo "Bluepilot web assets are up to date. Skipping build."
+  else
 
-  git add bluepilot/web/public
+    if [ ! -d "bluepilot/web/node_modules" ]; then
+      echo "bluepilot/web/node_modules not found. Run 'npm install' in bluepilot/web first." >&2
+      exit 1
+    fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+      if [ -x "/usr/local/opt/node@20/bin/npm" ]; then
+        export PATH="/usr/local/opt/node@20/bin:$PATH"
+      else
+        echo "npm not found. Skipping Bluepilot web build." >&2
+        echo "Install Node (e.g., brew install node@20) and re-run the commit to rebuild assets." >&2
+        exit 0
+      fi
+    fi
+
+    echo "Building Bluepilot web assets..."
+    (cd bluepilot/web && npm run build)
+
+    git add bluepilot/web/public
+  fi
 fi
