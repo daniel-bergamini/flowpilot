@@ -261,14 +261,27 @@ def _get_recent_branches() -> list:
         })
         seen.add(display)
 
-    # Prefer a combined, sorted view of remotes + locals
+    candidates = []
+    def add_candidate(name, short_sha, date_str):
+        if not name or name.endswith("/HEAD"):
+            return
+        display = name.replace("origin/", "")
+        if display in seen:
+            return
+        seen.add(display)
+        candidates.append({
+            "value": name,
+            "label": f"{display} ({date_str} {short_sha})".strip(),
+            "date": date_str,
+        })
+
+    # Prefer a combined view of remotes + locals
     result = subprocess.run(
         [
             "git",
             "-C",
             BASEDIR,
             "for-each-ref",
-            "--sort=-committerdate",
             "refs/remotes/origin",
             "refs/heads",
             "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
@@ -281,10 +294,10 @@ def _get_recent_branches() -> list:
             parts = line.split("\x1f")
             if len(parts) < 2:
                 continue
-            name = parts[0]
-            short_sha = parts[1]
-            date_str = parts[2] if len(parts) > 2 else ""
-            add_entry(name, short_sha, date_str)
+            add_candidate(parts[0], parts[1], parts[2] if len(parts) > 2 else "")
+
+    candidates.sort(key=lambda item: item.get("date") or "", reverse=True)
+    branches = [{"value": item["value"], "label": item["label"]} for item in candidates]
 
     # Fallback: explicit local branches
     if not branches:
@@ -356,13 +369,13 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
         branch_ref = None
 
     if not branch_ref:
-        branch_ref = _get_default_remote_ref() or "HEAD"
+        branch_ref = "HEAD"
 
     try:
         commits = _get_recent_commits(branch_ref)
     except Exception as exc:
         logger.warning("Failed to load recent commits for %s: %s", branch_ref, exc)
-        commits = _get_recent_commits(_get_default_remote_ref() or "HEAD")
+        commits = _get_recent_commits("HEAD")
 
     head = _current_git_head()
     commit_options = []
@@ -380,6 +393,12 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
                     if branch_ref and ref["value"] == branch_ref:
                         entry["default"] = True
                     branch_selection.append(entry)
+                if branch_ref == "HEAD":
+                    branch_selection.insert(0, {
+                        "name": "current (HEAD)",
+                        "value": "HEAD",
+                        "default": True,
+                    })
                 control["options"] = branch_selection
             if control.get("type") == "selection" and control.get("param") == FLOWPILOT_TARGET_PARAM:
                 control["options"] = commit_options
