@@ -184,12 +184,25 @@
     {
       "groupName": "fordSettingsGroup",
       "title": "Ford Settings",
-      "hidden": true,
+      "hidden": false,
       "controls": [
         {
-          "type": "static_text",
-          "title": "Ford-Specific Controls",
-          "desc": "This section is reserved for Ford-specific vehicle settings. BluePilot provides extensive Ford-specific tuning through other panels (Steering, Cruise, Visuals).\n\nNo additional Ford-specific controls are currently required here.",
+          "type": "selection",
+          "param": "FordSteerDriverAllowance",
+          "title": "Driver Torque Override Threshold",
+          "desc": "Steering torque (Nm) required to consider the driver overriding lateral control. Higher values require stronger driver input before Flow Pilot disengages steering.",
+          "options": [
+            { "name": "1.0 Nm", "value": "1.0" },
+            { "name": "1.5 Nm", "value": "1.5" },
+            { "name": "2.0 Nm", "value": "2.0" },
+            { "name": "2.5 Nm", "value": "2.5" },
+            { "name": "3.0 Nm", "value": "3.0", "default": true }
+          ],
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          },
           "visibleConditions": {
             "allConditionsTrue": [{ "brandEquals": "ford" }]
           }

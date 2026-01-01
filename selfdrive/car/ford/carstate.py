@@ -1,5 +1,8 @@
+import time
+
 from cereal import car
 from common.conversions import Conversions as CV
+from common.params import Params
 from opendbc.can.can_define import CANDefine
 from opendbc.can.parser import CANParser
 from selfdrive.car import ButtonType, create_button_event
@@ -17,9 +20,28 @@ class CarState(CarStateBase):
     if CP.transmissionType == TransmissionType.automatic:
       self.shifter_values = can_define.dv["Gear_Shift_by_Wire_FD1"]["TrnRng_D_RqGsm"]
 
+    self.params = Params()
+    self.steer_driver_allowance = CarControllerParams.STEER_DRIVER_ALLOWANCE
+    self._last_allowance_update = 0.0
+
     self.vehicle_sensors_valid = False
     self.hybrid_platform = False
     self.lc_button = False
+
+  def _update_steer_driver_allowance(self):
+    now = time.monotonic()
+    if now - self._last_allowance_update < 1.0:
+      return
+    self._last_allowance_update = now
+    try:
+      raw = self.params.get("FordSteerDriverAllowance")
+      if raw is None:
+        return
+      value = float(raw)
+      if value > 0:
+        self.steer_driver_allowance = value
+    except (ValueError, TypeError):
+      return
 
   def update(self, cp, cp_cam):
     ret = car.CarState.new_message()
@@ -53,7 +75,11 @@ class CarState(CarStateBase):
     # steering wheel
     ret.steeringAngleDeg = cp.vl["SteeringPinion_Data"]["StePinComp_An_Est"]
     ret.steeringTorque = cp.vl["EPAS_INFO"]["SteeringColumnTorque"]
-    ret.steeringPressed = self.update_steering_pressed(abs(ret.steeringTorque) > CarControllerParams.STEER_DRIVER_ALLOWANCE, 5)
+    self._update_steer_driver_allowance()
+    ret.steeringPressed = self.update_steering_pressed(
+      abs(ret.steeringTorque) > self.steer_driver_allowance,
+      5
+    )
     ret.steerFaultTemporary = cp.vl["EPAS_INFO"]["EPAS_Failure"] == 1
     ret.steerFaultPermanent = cp.vl["EPAS_INFO"]["EPAS_Failure"] in (2, 3)
     # ret.espDisabled = False  # TODO: find traction control signal
