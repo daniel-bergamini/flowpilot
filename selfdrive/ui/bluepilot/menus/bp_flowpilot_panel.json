@@ -2,12 +2,32 @@
   "_comment": "Flowpilot controls and version switching",
   "menuName": "Flow Pilot",
   "menuIcon": "icon_device.png",
-  "menuDescription": "Flow Pilot specific settings",
+  "menuDescription": "Flow Pilot settings",
   "persistentParams": [],
   "clearOnManagerStartParams": [],
   "clearOnOnroadTransitionParams": [],
   "clearOnOffroadTransitionParams": [],
   "groups": [
+    {
+      "groupName": "flowpilotSteeringGroup",
+      "title": "Flow Pilot Steering",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "FordSteerDriverAllowance",
+          "title": "Driver Torque Override Threshold",
+          "desc": "Steering torque (Nm) required to consider the driver overriding lateral control. Higher values require stronger driver input before Flow Pilot disengages steering.",
+          "options": [
+            { "name": "1.0 Nm", "value": "1.0" },
+            { "name": "1.5 Nm", "value": "1.5" },
+            { "name": "2.0 Nm", "value": "2.0" },
+            { "name": "2.5 Nm", "value": "2.5" },
+            { "name": "3.0 Nm", "value": "3.0", "default": true }
+          ]
+        }
+      ]
+    },
     {
       "groupName": "flowpilotVersionGroup",
       "title": "Flow Pilot Version",
