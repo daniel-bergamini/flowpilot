@@ -318,6 +318,19 @@ def write_param_direct(key: str, value: Any) -> Tuple[bool, Optional[str]]:
         return False, str(e)
 
 
+def read_param_direct(key: str) -> Optional[bytes]:
+    """Directly read a parameter file when Params API rejects the key."""
+    try:
+        param_path = os.path.join(PARAMS_DIR, key)
+        if not os.path.exists(param_path):
+            return None
+        with open(param_path, 'rb') as f:
+            return f.read()
+    except Exception as e:
+        logger.debug(f"Direct param read failed for {key}: {e}")
+        return None
+
+
 def categorize_param(key: str) -> str:
     """Determine which category a param belongs to.
 
@@ -549,9 +562,16 @@ def _build_param_entry(key: str, params: Optional[Params], params_dir: Optional[
 def _read_param_value(params: Params, key: str, param_type: Optional[str]) -> Any:
     """Read a parameter using the most appropriate getter based on its declared type."""
     if param_type == "bool":
-        return params.get_bool(key)
+        try:
+            return params.get_bool(key)
+        except UnknownKeyName:
+            raw = read_param_direct(key)
+            return raw == b"1" if raw is not None else False
     if param_type == "int":
-        value = params.get(key)
+        try:
+            value = params.get(key)
+        except UnknownKeyName:
+            value = read_param_direct(key)
         if isinstance(value, bytes):
             value = value.decode('utf-8', errors='replace').strip()
         try:
@@ -560,7 +580,10 @@ def _read_param_value(params: Params, key: str, param_type: Optional[str]) -> An
             logger.debug(f"Failed to parse param {key} as int from value '{value}'")
             return 0
     if param_type == "float":
-        value = params.get(key)
+        try:
+            value = params.get(key)
+        except UnknownKeyName:
+            value = read_param_direct(key)
         if isinstance(value, bytes):
             value = value.decode('utf-8', errors='replace').strip()
         try:
@@ -568,7 +591,10 @@ def _read_param_value(params: Params, key: str, param_type: Optional[str]) -> An
         except (ValueError, TypeError):
             logger.debug(f"Failed to parse param {key} as float from value '{value}'")
             return 0.0
-    value = params.get(key)
+    try:
+        value = params.get(key)
+    except UnknownKeyName:
+        value = read_param_direct(key)
     if isinstance(value, (bytes, bytearray)) and param_type in {"string", "json", "time"}:
         value = value.decode('utf-8', errors='replace')
     if param_type == "string" and isinstance(value, bytes):

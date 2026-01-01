@@ -102,6 +102,16 @@
       "enabled": true
     },
     {
+      "name": "FordSteerDriverAllowance",
+      "default": 1.0,
+      "min": 1.0,
+      "max": 3.0,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "BPUseBluepilotAlerts",
       "default": true,
       "type": "bool",
