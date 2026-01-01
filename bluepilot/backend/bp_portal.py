@@ -248,24 +248,57 @@ def _get_recent_branches() -> list:
     branches = []
     seen = set()
 
-    def add_ref(ref, source_prefix):
-        name = ref.get("value") or ""
-        if name.endswith("/HEAD"):
+    def add_entry(name, short_sha, date_str):
+        if not name or name.endswith("/HEAD"):
             return
-        display = name.replace(source_prefix, "") if source_prefix else name
-        if not display or display in seen:
+        display = name.replace("origin/", "")
+        if display in seen:
             return
-        label = f"{display} ({ref.get('date', '')} {ref.get('short', '')})".strip()
+        label = f"{display} ({date_str} {short_sha})".strip()
         branches.append({
             "value": name,
             "label": label,
         })
         seen.add(display)
 
-    for ref in _get_named_refs("refs/remotes/origin", "branch"):
-        add_ref(ref, "origin/")
-    for ref in _get_named_refs("refs/heads", "branch"):
-        add_ref(ref, "")
+    # Prefer a combined, sorted view of remotes + locals
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            BASEDIR,
+            "for-each-ref",
+            "--sort=-committerdate",
+            "refs/remotes/origin",
+            "refs/heads",
+            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode == 0:
+        for line in result.stdout.splitlines():
+            parts = line.split("\x1f")
+            if len(parts) < 2:
+                continue
+            name = parts[0]
+            short_sha = parts[1]
+            date_str = parts[2] if len(parts) > 2 else ""
+            add_entry(name, short_sha, date_str)
+
+    # Fallback: explicit local branches
+    if not branches:
+        result = subprocess.run(
+            ["git", "-C", BASEDIR, "branch", "--format=%(refname:short)|%(objectname:short)|%(committerdate:short)"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            for line in result.stdout.splitlines():
+                parts = line.split("|")
+                if len(parts) < 2:
+                    continue
+                add_entry(parts[0].strip(), parts[1].strip(), parts[2].strip() if len(parts) > 2 else "")
 
     if not branches:
         result = subprocess.run(
