@@ -136,6 +136,53 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const seenLinesRef = useRef<Set<string>>(new Set())
+  const lastLogAtRef = useRef<number>(0)
+  const lastPollAtRef = useRef<number>(0)
+
+  const hasTimestamp = useCallback((line: string) => {
+    return /^\x1b\[2m\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\x1b\[0m/.test(line)
+      || /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}/.test(line)
+  }, [])
+
+  const formatTimestamp = useCallback(() => {
+    const now = new Date()
+    const pad = (value: number, size = 2) => value.toString().padStart(size, '0')
+    const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} `
+      + `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`
+    return `\x1b[2m${ts}\x1b[0m`
+  }, [])
+
+  const formatLine = useCallback((line: string) => {
+    if (!line || hasTimestamp(line)) {
+      return line
+    }
+    return `${formatTimestamp()} ${line}`
+  }, [formatTimestamp, hasTimestamp])
+
+  const appendLines = useCallback((lines: string[]) => {
+    if (!lines.length) return
+    setLogLines(prev => {
+      const next = [...prev]
+      let appended = 0
+      for (const raw of lines) {
+        const line = raw.trim()
+        if (!line) continue
+        if (seenLinesRef.current.has(line)) continue
+        seenLinesRef.current.add(line)
+        next.push(formatLine(line))
+        appended += 1
+      }
+      if (appended > 0) {
+        lastLogAtRef.current = Date.now()
+      }
+      if (next.length > 2000) {
+        const removed = next.slice(0, next.length - 2000)
+        removed.forEach(line => seenLinesRef.current.delete(line))
+        return next.slice(-2000)
+      }
+      return next
+    })
+  }, [formatLine])
 
   // Load initial logs
   useEffect(() => {
@@ -146,9 +193,8 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
           const data: LogResponse = await response.json()
           if (data.success && data.output) {
             const lines = data.output.split('\n').filter(line => line.trim())
-            // Track seen lines for deduplication
             seenLinesRef.current = new Set(lines)
-            setLogLines(lines)
+            appendLines(lines)
           }
         }
       } catch (err) {
@@ -156,7 +202,7 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
       }
     }
     fetchInitialLogs()
-  }, [])
+  }, [appendLines])
 
   // WebSocket connection
   useEffect(() => {
@@ -183,11 +229,10 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
             }
             seenLinesRef.current.add(newLine)
 
+            lastLogAtRef.current = Date.now()
             setLogLines(prev => {
-              const newLines = [...prev, newLine]
-              // Keep only last 2000 lines to prevent memory issues
+              const newLines = [...prev, formatLine(newLine)]
               if (newLines.length > 2000) {
-                // Remove oldest lines from seen set too
                 const removed = newLines.slice(0, newLines.length - 2000)
                 removed.forEach(line => seenLinesRef.current.delete(line))
                 return newLines.slice(-2000)
@@ -237,6 +282,37 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
       ws.close()
     }
   }, [isPaused])
+
+  // Poll logs when websocket is unavailable or idle
+  useEffect(() => {
+    const pollLogs = async () => {
+      if (isPaused) return
+      const wsReady = wsRef.current && wsRef.current.readyState === WebSocket.OPEN
+      const idleMs = Date.now() - lastLogAtRef.current
+      if (wsReady && idleMs < 4000) {
+        return
+      }
+      const now = Date.now()
+      if (now - lastPollAtRef.current < 4000) {
+        return
+      }
+      lastPollAtRef.current = now
+      try {
+        const response = await fetch('/api/manager-logs')
+        if (!response.ok) return
+        const data: LogResponse = await response.json()
+        if (data.success && data.output) {
+          const lines = data.output.split('\n').filter(line => line.trim())
+          appendLines(lines)
+        }
+      } catch (err) {
+        console.error('Failed to poll logs:', err)
+      }
+    }
+
+    const interval = setInterval(pollLogs, 4000)
+    return () => clearInterval(interval)
+  }, [appendLines, isPaused])
 
   // Start streaming when component mounts
   useEffect(() => {
@@ -307,6 +383,7 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
   const handleClear = () => {
     setLogLines([])
     seenLinesRef.current.clear()
+    lastLogAtRef.current = 0
   }
 
   // Export logs to file
@@ -339,7 +416,7 @@ export function LogsView({ deviceStatus = 'checking' }: LogsViewProps) {
         const data: LogResponse = await response.json()
         if (data.success && data.output) {
           const lines = data.output.split('\n').filter(line => line.trim())
-          setLogLines(lines)
+          appendLines(lines)
         }
       }
     } catch (err) {
