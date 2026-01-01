@@ -3327,9 +3327,91 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                                 self.send_json_response({
                                     'success': False,
                                     'error': 'Repository has uncommitted changes',
-                                    'hint': 'Commit or stash changes before switching versions'
+                                    'hint': 'Commit, stash, or use Stash & Restart before switching versions'
                                 }, 409)
                                 return
+                        except Exception as exc:
+                            self.send_json_response({
+                                'success': False,
+                                'error': str(exc)
+                            }, 500)
+                            return
+
+                        checkout = subprocess.run(
+                            ["git", "-C", BASEDIR, "checkout", ref],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if checkout.returncode != 0:
+                            err = (checkout.stderr or checkout.stdout or "git checkout failed").strip()
+                            self.send_json_response({
+                                'success': False,
+                                'error': err
+                            }, 500)
+                            return
+
+                        restart_ok, restart_msg = _schedule_flowpilot_restart()
+                        if restart_ok:
+                            self.send_json_response({
+                                'success': True,
+                                'message': f'Checked out {ref}. {restart_msg}.'
+                            })
+                        else:
+                            self.send_json_response({
+                                'success': False,
+                                'error': restart_msg
+                            }, 500)
+
+                    elif action == 'flowpilot_checkout_stash':
+                        if is_onroad():
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'Flowpilot switch not allowed while driving',
+                                'hint': 'Park the vehicle to switch versions'
+                            }, 403)
+                            return
+
+                        ref = data.get('ref') or data.get('value')
+                        if not ref:
+                            try:
+                                ref_bytes = params.get(FLOWPILOT_TARGET_PARAM)
+                                if isinstance(ref_bytes, bytes):
+                                    ref = ref_bytes.decode('utf-8', errors='replace').strip()
+                                elif isinstance(ref_bytes, str):
+                                    ref = ref_bytes.strip()
+                            except Exception:
+                                ref = None
+
+                        if not ref:
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'No ref specified',
+                                'hint': f'Select a commit in {FLOWPILOT_TARGET_PARAM} and apply changes first'
+                            }, 400)
+                            return
+
+                        if not re.match(r'^[0-9A-Za-z._/\\-~^]+$', ref):
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'Invalid ref format',
+                                'hint': 'Use a commit SHA or branch name'
+                            }, 400)
+                            return
+
+                        try:
+                            if _repo_is_dirty():
+                                stash = subprocess.run(
+                                    ["git", "-C", BASEDIR, "stash", "push", "-u", "-m", "flowpilot web switch"],
+                                    capture_output=True,
+                                    text=True,
+                                )
+                                if stash.returncode != 0:
+                                    err = (stash.stderr or stash.stdout or "git stash failed").strip()
+                                    self.send_json_response({
+                                        'success': False,
+                                        'error': err
+                                    }, 500)
+                                    return
                         except Exception as exc:
                             self.send_json_response({
                                 'success': False,

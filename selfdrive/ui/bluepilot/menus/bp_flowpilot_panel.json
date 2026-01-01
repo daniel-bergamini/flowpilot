@@ -42,6 +42,23 @@
           "confirm_text": "This will checkout the selected ref and restart Flow Pilot. Continue?",
           "confirm_button_text": "Switch & Restart",
           "cancel_button_text": "Cancel"
+        },
+        {
+          "type": "command_button",
+          "title": "Stash & Restart Flow Pilot",
+          "desc": "Stash local changes, checkout the selected ref, and restart Flow Pilot services.",
+          "button_text": "STASH & RESTART",
+          "action": "flowpilot_checkout_stash",
+          "param": "FlowpilotTargetRef",
+          "confirm": true,
+          "confirm_text": "This will stash local changes, checkout the selected ref, and restart Flow Pilot. Continue?",
+          "confirm_button_text": "Stash & Restart",
+          "cancel_button_text": "Cancel",
+          "button_style": {
+            "background_color": "#FF8C00",
+            "background_color_pressed": "#FFA500",
+            "text_color": "#FFFFFF"
+          }
         }
       ]
     }

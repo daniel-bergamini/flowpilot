@@ -31,7 +31,12 @@ export function CommandButton({ control, disabled, disabledReason }: CommandButt
   const pendingChange = useChangeTrackingStore((state) =>
     control.param ? state.getChangeForParam(control.param) : undefined
   )
-  const getEffectiveValue = useParamsStore((state) => state.getEffectiveValue)
+  const { getEffectiveValue, updateParam, unstageParam } = useParamsStore((state) => ({
+    getEffectiveValue: state.getEffectiveValue,
+    updateParam: state.updateParam,
+    unstageParam: state.unstageParam,
+  }))
+  const discardTrackedChange = useChangeTrackingStore((state) => state.discardChange)
   const [showConfirm, setShowConfirm] = useState(false)
   const [showInput, setShowInput] = useState(false)
   const [showContent, setShowContent] = useState(false)
@@ -219,6 +224,17 @@ export function CommandButton({ control, disabled, disabledReason }: CommandButt
         // Execute panel command
         const stagedValue = pendingChange?.newValue
         const effectiveValue = control.param ? getEffectiveValue(control.param) : undefined
+
+        if (
+          control.param &&
+          pendingChange &&
+          (control.action === 'flowpilot_checkout' || control.action === 'flowpilot_checkout_stash')
+        ) {
+          await updateParam(control.param, pendingChange.newValue)
+          unstageParam(control.param)
+          discardTrackedChange(control.param)
+        }
+
         response = await panelAPI.executePanelCommand({
           action: control.action,
           param: control.param,
