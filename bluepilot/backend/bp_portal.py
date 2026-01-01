@@ -1075,6 +1075,25 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         logger.debug(f"Error reading openpilot version: {e}")
                         device_info['op_version'] = None
 
+                    # Get Flowpilot Version from common/version.h file
+                    try:
+                        fp_version_path = os.path.join(os.path.dirname(__file__), '../../common/version.h')
+                        if os.path.exists(fp_version_path):
+                            with open(fp_version_path, 'r') as f:
+                                content = f.read()
+                                # Extract version from #define FLOWPILOT_VERSION "0.2.3"
+                                import re
+                                match = re.search(r'#define\s+FLOWPILOT_VERSION\s+"([^"]+)"', content)
+                                if match:
+                                    device_info['fp_version'] = match.group(1)
+                                else:
+                                    device_info['fp_version'] = None
+                        else:
+                            device_info['fp_version'] = None
+                    except Exception as e:
+                        logger.debug(f"Error reading flowpilot version: {e}")
+                        device_info['fp_version'] = None
+
                     # Get SunnyPilot Version from version.h file
                     try:
                         sp_version_path = os.path.join(os.path.dirname(__file__), '../../sunnypilot/common/version.h')

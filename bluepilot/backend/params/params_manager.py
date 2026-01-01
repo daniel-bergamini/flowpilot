@@ -132,6 +132,20 @@ CRITICAL_PARAMS = {
     "LongitudinalPersonality",
 }
 
+# High-level categories used by the web UI.
+PARAM_CATEGORIES = {
+    "BluePilot": {
+        "name": "BluePilot",
+        "description": "BluePilot-specific settings",
+        "params": [],
+    },
+    "System": {
+        "name": "System",
+        "description": "Core system parameters",
+        "params": [],
+    },
+}
+
 # Cache for BluePilot panel params (loaded from JSON files)
 _BLUEPILOT_PARAMS_CACHE: Optional[set] = None
 
