@@ -246,12 +246,17 @@ def _get_named_refs(ref_root: str, label: str):
 
 def _get_recent_branches() -> list:
     refs = _get_named_refs("refs/remotes/origin", "branch")
+    source_prefix = "origin/"
+    if not refs:
+        refs = _get_named_refs("refs/heads", "branch")
+        source_prefix = ""
+
     branches = []
     for ref in refs:
         name = ref.get("value") or ""
         if name.endswith("/HEAD"):
             continue
-        display = name.replace("origin/", "")
+        display = name.replace(source_prefix, "") if source_prefix else name
         label = f"{display} ({ref.get('date', '')} {ref.get('short', '')})".strip()
         branches.append({
             "value": name,
