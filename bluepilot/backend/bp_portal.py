@@ -2643,6 +2643,27 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     logger.error(f"Error reading drive stats from param: {e}", exc_info=True)
                     self.send_json_response({'success': False, 'error': str(e)}, 500)
 
+            elif path == '/api/flowpilot/refs':
+                # Debug endpoint for flowpilot branch/commit selection
+                try:
+                    branch_options = _get_recent_branches()
+                    branch_ref = None
+                    branch_bytes = _read_param_bytes(FLOWPILOT_BRANCH_PARAM)
+                    if branch_bytes:
+                        branch_ref = branch_bytes.decode('utf-8', errors='replace').strip()
+                    branch_ref = branch_ref or "HEAD"
+                    commits = _get_recent_commits(branch_ref)
+
+                    self.send_json_response({
+                        'success': True,
+                        'branch_ref': branch_ref,
+                        'branches': branch_options,
+                        'commits': commits[:5],
+                    })
+                except Exception as e:
+                    logger.error(f"Error getting flowpilot refs: {e}", exc_info=True)
+                    self.send_json_response({'success': False, 'error': str(e)}, 500)
+
             elif path == '/api/file-content':
                 # Get file content for FileViewer control
                 try:
