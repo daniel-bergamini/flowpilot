@@ -138,6 +138,32 @@ class ParamsWatcher:
             return value
 
         except Exception:
+            raw = self._read_param_file(key)
+            if raw is None:
+                return None
+            if key.endswith("Enabled") or key.endswith("Toggle") or key in ["IsOnroad", "IsOffroad", "Passive"]:
+                return raw == b"1"
+            if isinstance(raw, (bytes, bytearray)):
+                value = raw.decode('utf-8', errors='replace')
+            else:
+                value = str(raw)
+            if value.isdigit():
+                return int(value)
+            try:
+                return float(value)
+            except ValueError:
+                return value
+
+    def _read_param_file(self, key: str) -> Optional[bytes]:
+        if not self.params_dir or not self.params_dir.exists():
+            return None
+        try:
+            param_path = self.params_dir / key
+            if not param_path.exists():
+                return None
+            return param_path.read_bytes()
+        except Exception as e:
+            logger.debug(f"Direct param file read failed for {key}: {e}")
             return None
 
     def _check_for_changes(self):
