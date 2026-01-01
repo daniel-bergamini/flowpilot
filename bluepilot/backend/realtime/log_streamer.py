@@ -6,10 +6,11 @@ Streams manager logs in real-time via WebSocket
 """
 
 import logging
+from datetime import datetime
 import threading
 from typing import Optional
 
-from bluepilot.backend.logs import parse_manager_log_line
+from bluepilot.backend.logs import parse_manager_log_line, read_tmux_logs
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ class LogStreamer:
         self._lock = threading.Lock()
         self._stop_event = threading.Event()
         self._sock = None
+        self._tmux_last_line = None
+        self._tmux_target = None
+        self._use_tmux = False
 
     def start(self):
         """Start streaming logs"""
@@ -42,15 +46,16 @@ class LogStreamer:
                 import cereal.messaging as messaging
 
                 self._sock = messaging.sub_sock('logMessage', timeout=1000, conflate=True)
+                self._use_tmux = False
             except Exception as exc:
                 logger.error("Unable to access logMessage stream: %s", exc)
-                self._broadcast_status('error', 'log stream unavailable')
-                return False
+                self._use_tmux = True
 
             self.running = True
             self._stop_event.clear()
 
-            self.thread = threading.Thread(target=self._read_logs, daemon=True)
+            target = self._read_tmux if self._use_tmux else self._read_logs
+            self.thread = threading.Thread(target=target, daemon=True)
             self.thread.start()
 
             logger.info("Log streamer started")
@@ -129,6 +134,36 @@ class LogStreamer:
                 except Exception:
                     pass
             self._sock = None
+
+    def _read_tmux(self):
+        """Read logs from tmux output and broadcast."""
+        from bluepilot.backend.realtime.websocket import WebSocketEvent
+
+        poll_interval = 1.0
+        while self.running:
+            ok, output = read_tmux_logs(max_lines=2000, target=self._tmux_target, with_timestamps=False)
+            if ok and output:
+                lines = [line for line in output.splitlines() if line.strip()]
+                new_lines = []
+                if self._tmux_last_line and self._tmux_last_line in lines:
+                    idx = lines.index(self._tmux_last_line)
+                    new_lines = lines[idx + 1:]
+                else:
+                    new_lines = lines[-200:]
+
+                for line in new_lines:
+                    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+                    formatted = f"\x1b[2m{timestamp}\x1b[0m {line}".rstrip()
+                    self.broadcaster.broadcast(WebSocketEvent.LOG_LINE, {'line': formatted})
+
+                if lines:
+                    self._tmux_last_line = lines[-1]
+            else:
+                if ok is False and output:
+                    self._broadcast_status('error', output)
+
+            if self._stop_event.wait(timeout=poll_interval):
+                break
 
     def _broadcast_status(self, status, message=None):
         """Broadcast stream status change"""

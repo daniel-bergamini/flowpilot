@@ -1,0 +1,16 @@
+#!/usr/bin/env sh
+set -eu
+
+changed_files="$(git diff --cached --name-only)"
+
+if echo "$changed_files" | grep -qE '^bluepilot/web/(src/|package.json|package-lock.json|tsconfig.*|vite.config.ts)'; then
+  if [ ! -d "bluepilot/web/node_modules" ]; then
+    echo "bluepilot/web/node_modules not found. Run 'npm install' in bluepilot/web first." >&2
+    exit 1
+  fi
+
+  echo "Building Bluepilot web assets..."
+  (cd bluepilot/web && npm run build)
+
+  git add bluepilot/web/public
+fi

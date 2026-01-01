@@ -1407,7 +1407,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                 if not manager_ok:
                     tmux_target = parse_qs(parsed.query).get('tmux', [''])[0].strip() or None
-                    tmux_ok, tmux_output = read_tmux_logs(target=tmux_target)
+                    tmux_ok, tmux_output = read_tmux_logs(target=tmux_target, with_timestamps=True)
                     if tmux_ok:
                         source = 'tmux'
                         output = tmux_output

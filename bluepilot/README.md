@@ -320,17 +320,30 @@ Then open http://localhost:8088 in your browser.
 
 ```bash
 cd bluepilot/web
-./build.sh
+npm install
+npm run build
 ```
 
 This copies files from `src/` to `public/` (which is committed to the repo).
 
+You can also run the helper script from repo root:
+
+```bash
+./scripts/build-bluepilot-web.sh
+```
+
 ### Modifying the UI
 
 1. Edit files in `bluepilot/web/src/`
-2. Run `./build.sh` to update `public/`
+2. Run `npm run build` (or `./scripts/build-bluepilot-web.sh`) to update `public/`
 3. Refresh browser to see changes
 4. Commit both `src/` and `public/` directories
+
+To automate this, enable the pre-commit hook:
+
+```bash
+./scripts/setup-githooks.sh
+```
 
 ## Configuration
 

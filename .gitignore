@@ -36,6 +36,7 @@ a.out
 .hypothesis
 .dep_update
 .pip_update
+node_modules/
 
 *.dylib
 *.DSYM

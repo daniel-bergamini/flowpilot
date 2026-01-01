@@ -13,6 +13,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 from collections import deque
 from datetime import datetime
 from typing import Deque, Dict, Optional, Tuple
@@ -74,6 +75,12 @@ def _format_timestamp(value: Optional[float]) -> str:
         return dt.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
     except Exception:
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+
+
+def _format_tmux_line(line: str) -> str:
+    """Add a timestamp prefix to a tmux log line."""
+    timestamp = _format_timestamp(time.time())
+    return f"{ANSI_DIM}{timestamp}{ANSI_RESET} {line}".rstrip()
 
 
 def _stringify_message(message, preserve_ansi: bool = True) -> str:
@@ -181,12 +188,36 @@ def read_recent_manager_logs(max_lines: int = 1000, max_files: int = 25) -> Tupl
     return True, '\n'.join(lines)
 
 
-def read_tmux_logs(max_lines: int = 2000, target: Optional[str] = None) -> Tuple[bool, str]:
+def _find_tmux_target() -> Optional[str]:
+    """Return a tmux target pane if no current client is available."""
+    try:
+        result = subprocess.run(
+            ["tmux", "list-panes", "-a", "-F", "#S:#I.#P"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+    except Exception:
+        return None
+
+    if result.returncode != 0:
+        return None
+
+    panes = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    return panes[0] if panes else None
+
+
+def read_tmux_logs(
+    max_lines: int = 2000,
+    target: Optional[str] = None,
+    with_timestamps: bool = False,
+) -> Tuple[bool, str]:
     """Read recent output from a tmux pane.
 
     Args:
         max_lines: number of lines to capture from scrollback
         target: optional tmux target (session:window.pane)
+        with_timestamps: prefix lines with timestamps
     """
     cmd = ["tmux", "capture-pane", "-pS", f"-{max_lines}"]
     if target:
@@ -201,9 +232,20 @@ def read_tmux_logs(max_lines: int = 2000, target: Optional[str] = None) -> Tuple
 
     if result.returncode != 0:
         err = (result.stderr or result.stdout or "").strip()
+        if not target and err and "no current client" in err.lower():
+            fallback_target = _find_tmux_target()
+            if fallback_target:
+                return read_tmux_logs(
+                    max_lines=max_lines,
+                    target=fallback_target,
+                    with_timestamps=with_timestamps,
+                )
         return False, err or "tmux capture failed"
 
     output = result.stdout.strip()
     if not output:
         return False, "tmux capture empty"
+    if with_timestamps:
+        lines = [_format_tmux_line(line) for line in output.splitlines() if line.strip()]
+        return True, "\n".join(lines)
     return True, output
