@@ -5,12 +5,12 @@ Provides a minimal mock with sensible defaults for backend utilities.
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
 
-def get_params_with_defaults(defaults: Dict[str, Any] | None = None):
+def get_params_with_defaults(defaults: Optional[Dict[str, Any]] = None):
     """Return openpilot Params when available, otherwise a lightweight mock."""
     defaults = defaults or {}
     try:
@@ -22,7 +22,7 @@ def get_params_with_defaults(defaults: Dict[str, Any] | None = None):
         logger.error(f"Unexpected Params import error: {exc}")
 
     class Params:
-        def __init__(self, initial: Dict[str, Any] | None = None):
+        def __init__(self, initial: Optional[Dict[str, Any]] = None):
             self._params = dict(initial or {})
 
         def get_bool(self, key: str):
