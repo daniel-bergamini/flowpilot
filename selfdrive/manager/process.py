@@ -62,6 +62,7 @@ class ManagerProcess:
         if not self.pipe_std:
             stdout = stderr = None
         if LOG_TO_FILES:
+            os.makedirs(LOGPATH, exist_ok=True)
             with open(
                 os.path.join(LOGPATH, f"{self.name}.stdout"), "a"
             ) as stdout, open(
