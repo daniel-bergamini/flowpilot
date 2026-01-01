@@ -39,7 +39,7 @@
           "action": "flowpilot_checkout",
           "param": "FlowpilotTargetRef",
           "confirm": true,
-          "confirm_text": "This will checkout the selected commit and restart Flowpilot. Continue?",
+          "confirm_text": "This will checkout the selected ref and restart Flow Pilot. Continue?",
           "confirm_button_text": "Switch & Restart",
           "cancel_button_text": "Cancel"
         }

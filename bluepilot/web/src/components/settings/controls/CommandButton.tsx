@@ -7,6 +7,7 @@ import { useMemo, useState, useEffect } from 'react'
 import type { CommandButtonControl } from '@/types/panels'
 import { usePanelStateStore } from '@/stores/usePanelStateStore'
 import { useChangeTrackingStore } from '@/stores/useChangeTrackingStore'
+import { useParamsStore } from '@/stores/useParamsStore'
 import { panelAPI } from '@/services/panelAPI'
 import { getDynamicDescription } from '@/utils/conditionalEvaluator'
 import { Button, ControlCard, Modal, InputDialog, ConfirmDialog } from '@/components/common'
@@ -30,6 +31,7 @@ export function CommandButton({ control, disabled, disabledReason }: CommandButt
   const pendingChange = useChangeTrackingStore((state) =>
     control.param ? state.getChangeForParam(control.param) : undefined
   )
+  const getEffectiveValue = useParamsStore((state) => state.getEffectiveValue)
   const [showConfirm, setShowConfirm] = useState(false)
   const [showInput, setShowInput] = useState(false)
   const [showContent, setShowContent] = useState(false)
@@ -216,10 +218,11 @@ export function CommandButton({ control, disabled, disabledReason }: CommandButt
       } else if (control.action) {
         // Execute panel command
         const stagedValue = pendingChange?.newValue
+        const effectiveValue = control.param ? getEffectiveValue(control.param) : undefined
         response = await panelAPI.executePanelCommand({
           action: control.action,
           param: control.param,
-          value: stagedValue !== undefined ? stagedValue : control.value,
+          value: stagedValue !== undefined ? stagedValue : (effectiveValue ?? control.value),
           params: control.params,
         })
       } else {
