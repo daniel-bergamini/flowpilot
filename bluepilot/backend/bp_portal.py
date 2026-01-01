@@ -193,40 +193,40 @@ def _get_recent_commits(limit: int = 20):
     return commits
 
 
-def _get_named_refs():
+def _get_named_refs(ref_root: str, label: str):
     refs = []
-    for ref_root, label in (("refs/heads", "branch"), ("refs/tags", "tag")):
-        result = subprocess.run(
-            [
-                "git",
-                "-C",
-                BASEDIR,
-                "for-each-ref",
-                ref_root,
-                "--format=%(refname:short)%x1f%(objectname:short)%x1f%(creatordate:short)",
-            ],
-            capture_output=True,
-            text=True,
-        )
-        if result.returncode != 0:
+    result = subprocess.run(
+        [
+            "git",
+            "-C",
+            BASEDIR,
+            "for-each-ref",
+            "--sort=-creatordate",
+            ref_root,
+            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(creatordate:short)",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return refs
+    for line in result.stdout.splitlines():
+        parts = line.split("\x1f")
+        if len(parts) < 2:
             continue
-        for line in result.stdout.splitlines():
-            parts = line.split("\x1f")
-            if len(parts) < 2:
-                continue
-            name = parts[0]
-            short_sha = parts[1]
-            date_str = parts[2] if len(parts) > 2 else ""
-            label_text = f"{label}: {name}"
-            if date_str:
-                label_text = f"{label_text} ({date_str} {short_sha})"
-            refs.append({
-                "value": name,
-                "label": label_text,
-                "short": short_sha,
-                "date": date_str,
-                "kind": label,
-            })
+        name = parts[0]
+        short_sha = parts[1]
+        date_str = parts[2] if len(parts) > 2 else ""
+        label_text = f"{label}: {name}"
+        if date_str:
+            label_text = f"{label_text} ({date_str} {short_sha})"
+        refs.append({
+            "value": name,
+            "label": label_text,
+            "short": short_sha,
+            "date": date_str,
+            "kind": label,
+        })
     return refs
 
 
@@ -255,7 +255,8 @@ def _repo_is_dirty():
 def _populate_flowpilot_panel(panel_data: dict) -> dict:
     try:
         commits = _get_recent_commits()
-        refs = _get_named_refs()
+        branches = _get_named_refs("refs/heads", "branch")
+        tags = _get_named_refs("refs/tags", "tag")
     except Exception as exc:
         logger.warning("Failed to load recent commits: %s", exc)
         return panel_data
@@ -267,9 +268,13 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
         if head and commit["value"] == head:
             option["default"] = True
         options.append(option)
-    if refs:
-        options.append({"name": "— Branches & Tags —", "value": "", "default": False})
-        for ref in refs:
+    if branches:
+        options.append({"name": "— Branches —", "value": "", "default": False})
+        for ref in branches:
+            options.append({"name": ref["label"], "value": ref["value"]})
+    if tags:
+        options.append({"name": "— Tags —", "value": "", "default": False})
+        for ref in tags:
             options.append({"name": ref["label"], "value": ref["value"]})
 
     for group in panel_data.get("groups", []):

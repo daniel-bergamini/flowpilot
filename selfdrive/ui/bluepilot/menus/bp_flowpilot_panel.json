@@ -2,7 +2,7 @@
   "_comment": "Flowpilot controls and version switching",
   "menuName": "Flow Pilot",
   "menuIcon": "icon_device.png",
-  "menuDescription": "Flowpilot version management",
+  "menuDescription": "Flow Pilot specific settings",
   "persistentParams": [],
   "clearOnManagerStartParams": [],
   "clearOnOnroadTransitionParams": [],
