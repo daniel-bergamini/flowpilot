@@ -247,45 +247,55 @@ def _get_named_refs(ref_root: str, label: str):
 def _get_recent_branches() -> list:
     branches = []
     seen = set()
-
     candidates = []
-    def add_candidate(name, short_sha, date_ts, date_str):
+
+    def add_candidate(name, short_sha, date_str):
         if not name or name.endswith("/HEAD"):
             return
         display = name.replace("origin/", "")
         if display in seen:
             return
         seen.add(display)
+        label = f"{display} ({date_str} {short_sha})".strip()
         candidates.append({
             "value": name,
-            "label": f"{display} ({date_str} {short_sha})".strip(),
-            "date_ts": date_ts,
+            "label": label,
         })
 
-    # Prefer a combined view of remotes + locals
-    result = subprocess.run(
-        [
+    def read_candidates(format_str, with_sort=True):
+        cmd = [
             "git",
             "-C",
             BASEDIR,
             "for-each-ref",
-            "refs/remotes/origin",
+        ]
+        if with_sort:
+            cmd.append("--sort=-committerdate")
+        cmd.extend([
             "refs/heads",
-            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:unix)%x1f%(committerdate:short)",
-        ],
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode == 0:
+            "refs/remotes/origin",
+            f"--format={format_str}",
+        ])
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return False
         for line in result.stdout.splitlines():
             parts = line.split("\x1f")
             if len(parts) < 2:
                 continue
-            date_ts = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
-            date_str = parts[3] if len(parts) > 3 else ""
-            add_candidate(parts[0], parts[1], date_ts, date_str)
+            date_str = parts[2] if len(parts) > 2 else ""
+            add_candidate(parts[0], parts[1], date_str)
+        return True
 
-    candidates.sort(key=lambda item: item.get("date_ts") or 0, reverse=True)
+    if not read_candidates("%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)"):
+        # Older git may not support committerdate formatting; fall back to a minimal format.
+        if not read_candidates("%(refname:short)%x1f%(objectname:short)", with_sort=True):
+            read_candidates("%(refname:short)%x1f%(objectname:short)", with_sort=False)
+
     branches = [{"value": item["value"], "label": item["label"]} for item in candidates]
 
     if not branches:
@@ -313,6 +323,20 @@ def _current_git_head():
     if result.returncode != 0:
         return None
     return (result.stdout or "").strip() or None
+
+
+def _current_git_branch():
+    result = subprocess.run(
+        ["git", "-C", BASEDIR, "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    branch = (result.stdout or "").strip()
+    if branch and branch != "HEAD":
+        return branch
+    return None
 
 
 def _repo_is_dirty():
@@ -363,7 +387,7 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
         branch_ref = None
 
     if not branch_ref:
-        branch_ref = "HEAD"
+        branch_ref = _current_git_branch() or "HEAD"
 
     try:
         commits = _get_recent_commits(branch_ref)
@@ -391,6 +415,12 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
                     branch_selection.insert(0, {
                         "name": "current (HEAD)",
                         "value": "HEAD",
+                        "default": True,
+                    })
+                elif branch_ref and not any(ref["value"] == branch_ref for ref in branch_options):
+                    branch_selection.insert(0, {
+                        "name": f"{branch_ref} (current)",
+                        "value": branch_ref,
                         "default": True,
                     })
                 control["options"] = branch_selection
@@ -2651,7 +2681,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     branch_bytes = _read_param_bytes(FLOWPILOT_BRANCH_PARAM)
                     if branch_bytes:
                         branch_ref = branch_bytes.decode('utf-8', errors='replace').strip()
-                    branch_ref = branch_ref or "HEAD"
+                    branch_ref = branch_ref or _current_git_branch() or "HEAD"
                     commits = _get_recent_commits(branch_ref)
 
                     self.send_json_response({
