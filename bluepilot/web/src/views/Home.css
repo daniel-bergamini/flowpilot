@@ -116,6 +116,13 @@
   font-size: 0.8rem;
 }
 
+.status-pill .pill-subvalue {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--bp-text-secondary);
+}
+
 /* Color states for metric pills */
 .status-pill.normal {
   background: rgba(76, 175, 80, 0.1);

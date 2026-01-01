@@ -179,6 +179,7 @@ export interface DeviceInfo {
   sp_version: string | null
   op_version: string | null
   fp_version: string | null
+  fp_build?: string | null
 }
 
 export interface VideoPlayerState {

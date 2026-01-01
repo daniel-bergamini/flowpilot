@@ -1233,6 +1233,17 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         logger.debug(f"Error reading flowpilot version: {e}")
                         device_info['fp_version'] = None
 
+                    # Get latest Flowpilot build info from git
+                    try:
+                        commit = _get_recent_commits(limit=1)
+                        if commit:
+                            device_info['fp_build'] = commit[0]["label"]
+                        else:
+                            device_info['fp_build'] = None
+                    except Exception as e:
+                        logger.debug(f"Error reading flowpilot build info: {e}")
+                        device_info['fp_build'] = None
+
                     # Get SunnyPilot Version from version.h file
                     try:
                         sp_version_path = os.path.join(os.path.dirname(__file__), '../../sunnypilot/common/version.h')
