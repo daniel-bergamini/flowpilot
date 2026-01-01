@@ -63,12 +63,8 @@ class ManagerProcess:
             stdout = stderr = None
         if LOG_TO_FILES:
             os.makedirs(LOGPATH, exist_ok=True)
-            with open(
-                os.path.join(LOGPATH, f"{self.name}.stdout"), "a"
-            ) as stdout, open(
-                os.path.join(LOGPATH, f"{self.name}.stderr"), "a"
-            ) as stderr:
-                stdout, stderr = stdout, stderr
+            stdout = open(os.path.join(LOGPATH, f"{self.name}.stdout"), "a")
+            stderr = open(os.path.join(LOGPATH, f"{self.name}.stderr"), "a")
 
         self.proc = subprocess.Popen(
                     [self.command] + self.args, stdout=stdout, stderr=stderr, shell=self.shell
