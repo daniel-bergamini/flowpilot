@@ -285,28 +285,26 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
 
 def _schedule_flowpilot_restart():
     flowinit_path = shutil.which("flowinit")
-    launch_script = os.path.join(BASEDIR, "launch_flowpilot_full.sh")
     tmux_path = shutil.which("tmux")
 
-    if os.path.exists(launch_script):
-        if tmux_path:
-            cmd = (
-                "sleep 1; "
-                "pkill -f flowinit || true; "
-                "tmux kill-session -t flowpilot || true; "
-                "tmux new-session -d -s flowpilot "
-                f"'{launch_script}'"
-            )
-        else:
-            cmd = (
-                "sleep 1; "
-                "pkill -f flowinit || true; "
-                f"nohup '{launch_script}' >/dev/null 2>&1 &"
-            )
+    if not flowinit_path:
+        return False, "flowinit not found in PATH"
+
+    launch_cmd = f"cd '{BASEDIR}' && scons && flowinit"
+    if tmux_path:
+        cmd = (
+            "sleep 1; "
+            "pkill -f flowinit || true; "
+            "tmux kill-session -t flowpilot || true; "
+            "tmux new-session -d -s flowpilot "
+            f"\"{launch_cmd}\""
+        )
     else:
-        if not flowinit_path:
-            return False, "flowinit not found in PATH"
-        cmd = "sleep 1; pkill -f flowinit; sleep 1; flowinit"
+        cmd = (
+            "sleep 1; "
+            "pkill -f flowinit || true; "
+            f"nohup sh -lc \"{launch_cmd}\" >/dev/null 2>&1 &"
+        )
 
     subprocess.Popen(
         ["sh", "-c", cmd],
