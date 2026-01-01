@@ -262,20 +262,7 @@ def _get_recent_branches() -> list:
             "label": label,
         })
 
-    def read_candidates(format_str, with_sort=True):
-        cmd = [
-            "git",
-            "-C",
-            BASEDIR,
-            "for-each-ref",
-        ]
-        if with_sort:
-            cmd.append("--sort=-committerdate")
-        cmd.extend([
-            "refs/heads",
-            "refs/remotes/origin",
-            f"--format={format_str}",
-        ])
+    def read_candidates_from_cmd(cmd):
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -291,10 +278,48 @@ def _get_recent_branches() -> list:
             add_candidate(parts[0], parts[1], date_str)
         return True
 
-    if not read_candidates("%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)"):
-        # Older git may not support committerdate formatting; fall back to a minimal format.
-        if not read_candidates("%(refname:short)%x1f%(objectname:short)", with_sort=True):
-            read_candidates("%(refname:short)%x1f%(objectname:short)", with_sort=False)
+    branch_cmd = [
+        "git",
+        "-C",
+        BASEDIR,
+        "branch",
+        "-a",
+        "--sort=-committerdate",
+        "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
+    ]
+    if not read_candidates_from_cmd(branch_cmd):
+        branch_cmd = [
+            "git",
+            "-C",
+            BASEDIR,
+            "branch",
+            "-a",
+            "--format=%(refname:short)%x1f%(objectname:short)",
+        ]
+        read_candidates_from_cmd(branch_cmd)
+
+    if len(candidates) <= 1:
+        for_each_cmd = [
+            "git",
+            "-C",
+            BASEDIR,
+            "for-each-ref",
+            "--sort=-committerdate",
+            "refs/heads",
+            "refs/remotes",
+            "--format=%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:short)",
+        ]
+        if not read_candidates_from_cmd(for_each_cmd):
+            for_each_cmd = [
+                "git",
+                "-C",
+                BASEDIR,
+                "for-each-ref",
+                "refs/heads",
+                "refs/remotes",
+                "--format=%(refname:short)%x1f%(objectname:short)",
+            ]
+            read_candidates_from_cmd(for_each_cmd)
 
     branches = [{"value": item["value"], "label": item["label"]} for item in candidates]
 
