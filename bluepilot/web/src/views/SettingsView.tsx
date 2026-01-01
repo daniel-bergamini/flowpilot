@@ -25,6 +25,7 @@ type PanelIconKey =
   | 'bp_device_panel'
   | 'bp_display_panel'
   | 'bp_visuals_panel'
+  | 'bp_flowpilot_panel'
   | 'bp_vehicle_panel'
   | 'bp_cruise_panel'
   | 'bp_toggles_panel'
@@ -37,6 +38,7 @@ const panelIcons: Record<PanelIconKey, () => JSX.Element> = {
   bp_device_panel: () => <Icon name="devices" />,
   bp_display_panel: () => <Icon name="monitor" />,
   bp_visuals_panel: () => <Icon name="visibility" />,
+  bp_flowpilot_panel: () => <Icon name="settings" />,
   bp_vehicle_panel: () => <Icon name="directions_car" />,
   bp_cruise_panel: () => <Icon name="speed" />,
   bp_toggles_panel: () => <Icon name="toggle_on" />,

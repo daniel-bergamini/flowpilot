@@ -9,6 +9,16 @@ if echo "$changed_files" | grep -qE '^bluepilot/web/(src/|package.json|package-l
     exit 1
   fi
 
+  if ! command -v npm >/dev/null 2>&1; then
+    if [ -x "/usr/local/opt/node@20/bin/npm" ]; then
+      export PATH="/usr/local/opt/node@20/bin:$PATH"
+    else
+      echo "npm not found. Skipping Bluepilot web build." >&2
+      echo "Install Node (e.g., brew install node@20) and re-run the commit to rebuild assets." >&2
+      exit 0
+    fi
+  fi
+
   echo "Building Bluepilot web assets..."
   (cd bluepilot/web && npm run build)
 

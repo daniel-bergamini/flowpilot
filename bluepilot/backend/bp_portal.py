@@ -159,6 +159,141 @@ from bluepilot.backend.handlers.log_downloads import (
 from bluepilot.backend.params.params_manager import Params
 params = Params()
 
+FLOWPILOT_TARGET_PARAM = "FlowpilotTargetRef"
+
+
+def _get_recent_commits(limit: int = 20):
+    cmd = [
+        "git",
+        "-C",
+        BASEDIR,
+        "log",
+        f"-n{limit}",
+        "--date=short",
+        "--pretty=format:%H%x1f%h%x1f%ad%x1f%s",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "git log failed").strip())
+
+    commits = []
+    for line in result.stdout.splitlines():
+        parts = line.split("\x1f")
+        if len(parts) != 4:
+            continue
+        full_sha, short_sha, date_str, subject = parts
+        commits.append({
+            "value": full_sha,
+            "label": f"{date_str} {short_sha} {subject}",
+            "short": short_sha,
+            "date": date_str,
+            "subject": subject,
+        })
+    commits.reverse()
+    return commits
+
+
+def _get_named_refs():
+    refs = []
+    for ref_root, label in (("refs/heads", "branch"), ("refs/tags", "tag")):
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                BASEDIR,
+                "for-each-ref",
+                ref_root,
+                "--format=%(refname:short)%x1f%(objectname:short)%x1f%(creatordate:short)",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            parts = line.split("\x1f")
+            if len(parts) < 2:
+                continue
+            name = parts[0]
+            short_sha = parts[1]
+            date_str = parts[2] if len(parts) > 2 else ""
+            label_text = f"{label}: {name}"
+            if date_str:
+                label_text = f"{label_text} ({date_str} {short_sha})"
+            refs.append({
+                "value": name,
+                "label": label_text,
+                "short": short_sha,
+                "date": date_str,
+                "kind": label,
+            })
+    return refs
+
+
+def _current_git_head():
+    result = subprocess.run(
+        ["git", "-C", BASEDIR, "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    return (result.stdout or "").strip() or None
+
+
+def _repo_is_dirty():
+    result = subprocess.run(
+        ["git", "-C", BASEDIR, "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "git status failed").strip())
+    return bool(result.stdout.strip())
+
+
+def _populate_flowpilot_panel(panel_data: dict) -> dict:
+    try:
+        commits = _get_recent_commits()
+        refs = _get_named_refs()
+    except Exception as exc:
+        logger.warning("Failed to load recent commits: %s", exc)
+        return panel_data
+
+    head = _current_git_head()
+    options = []
+    for commit in commits:
+        option = {"name": commit["label"], "value": commit["value"]}
+        if head and commit["value"] == head:
+            option["default"] = True
+        options.append(option)
+    if refs:
+        options.append({"name": "— Branches & Tags —", "value": "", "default": False})
+        for ref in refs:
+            options.append({"name": ref["label"], "value": ref["value"]})
+
+    for group in panel_data.get("groups", []):
+        for control in group.get("controls", []):
+            if control.get("type") == "selection" and control.get("param") == FLOWPILOT_TARGET_PARAM:
+                control["options"] = options
+    return panel_data
+
+
+def _schedule_flowpilot_restart():
+    flowinit_path = shutil.which("flowinit")
+    if not flowinit_path:
+        return False, "flowinit not found in PATH"
+
+    cmd = "sleep 1; pkill -f flowinit; sleep 1; flowinit"
+    subprocess.Popen(
+        ["sh", "-c", cmd],
+        cwd=BASEDIR,
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return True, "Flowpilot restart scheduled"
+
 
 def restart_ui_process():
     """Attempt to restart the UI process by signaling the running binary."""
@@ -2048,6 +2183,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                     # Define Qt settings order (matching selfdrive/ui/bluepilot/qt/offroad/settings.cc)
                     panel_order = [
+                        'bp_flowpilot_panel',
                         'bp_device_panel',
                         'bp_toggles_panel',
                         'bp_steering_panel',
@@ -2109,6 +2245,9 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                     with open(panel_file, 'r') as f:
                         panel_data = json.load(f)
+
+                    if panel_id == 'bp_flowpilot_panel':
+                        panel_data = _populate_flowpilot_panel(panel_data)
 
                     self.send_json_response({
                         'success': True,
@@ -3130,6 +3269,79 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             self.send_json_response({
                                 'success': False,
                                 'error': message
+                            }, 500)
+
+                    elif action == 'flowpilot_checkout':
+                        if is_onroad():
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'Flowpilot switch not allowed while driving',
+                                'hint': 'Park the vehicle to switch versions'
+                            }, 403)
+                            return
+
+                        ref = data.get('ref') or data.get('value')
+                        if not ref:
+                            ref_bytes = params.get(FLOWPILOT_TARGET_PARAM)
+                            if isinstance(ref_bytes, bytes):
+                                ref = ref_bytes.decode('utf-8', errors='replace').strip()
+                            elif isinstance(ref_bytes, str):
+                                ref = ref_bytes.strip()
+
+                        if not ref:
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'No ref specified',
+                                'hint': f'Select a commit in {FLOWPILOT_TARGET_PARAM} first'
+                            }, 400)
+                            return
+
+                        if not re.match(r'^[0-9A-Za-z._/\\-~^]+$', ref):
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'Invalid ref format',
+                                'hint': 'Use a commit SHA or branch name'
+                            }, 400)
+                            return
+
+                        try:
+                            if _repo_is_dirty():
+                                self.send_json_response({
+                                    'success': False,
+                                    'error': 'Repository has uncommitted changes',
+                                    'hint': 'Commit or stash changes before switching versions'
+                                }, 409)
+                                return
+                        except Exception as exc:
+                            self.send_json_response({
+                                'success': False,
+                                'error': str(exc)
+                            }, 500)
+                            return
+
+                        checkout = subprocess.run(
+                            ["git", "-C", BASEDIR, "checkout", ref],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if checkout.returncode != 0:
+                            err = (checkout.stderr or checkout.stdout or "git checkout failed").strip()
+                            self.send_json_response({
+                                'success': False,
+                                'error': err
+                            }, 500)
+                            return
+
+                        restart_ok, restart_msg = _schedule_flowpilot_restart()
+                        if restart_ok:
+                            self.send_json_response({
+                                'success': True,
+                                'message': f'Checked out {ref}. {restart_msg}.'
+                            })
+                        else:
+                            self.send_json_response({
+                                'success': False,
+                                'error': restart_msg
                             }, 500)
 
                     elif action == 'manage_ssh_keys':

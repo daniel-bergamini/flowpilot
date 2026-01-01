@@ -1,0 +1,37 @@
+{
+  "_comment": "Flowpilot controls and version switching",
+  "menuName": "Flow Pilot",
+  "menuIcon": "icon_device.png",
+  "menuDescription": "Flowpilot version management",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "flowpilotVersionGroup",
+      "title": "Flowpilot Version",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "FlowpilotTargetRef",
+          "title": "Target Commit",
+          "desc": "Select from the last 20 commits (chronological).",
+          "options": []
+        },
+        {
+          "type": "command_button",
+          "title": "Restart Flowpilot Back-End",
+          "desc": "Checkout the selected commit and restart Flowpilot services.",
+          "button_text": "SWITCH & RESTART",
+          "action": "flowpilot_checkout",
+          "confirm": true,
+          "confirm_text": "This will checkout the selected commit and restart Flowpilot. Continue?",
+          "confirm_button_text": "Switch & Restart",
+          "cancel_button_text": "Cancel"
+        }
+      ]
+    }
+  ]
+}
