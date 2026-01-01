@@ -17,6 +17,15 @@ def useModelParseD():
   #return False #if we are running externally
   return Params().get_bool("F3")
 
+def webportal_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
+  try:
+    raw = params.get("WebPortalEnabled")  # type: ignore
+    if raw is None or raw == b"" or raw == "":
+      return True
+    return params.get_bool("WebPortalEnabled")  # type: ignore
+  except Exception:
+    return True
+
 procs = [
   ManagerProcess("controlsd", "controlsd"),
   ManagerProcess("plannerd", "plannerd"),
@@ -29,6 +38,7 @@ procs = [
   ManagerProcess("thermald_", "thermald_", offroad=True),
   #ManagerProcess("statsd", "statsd", offroad=True),
   ManagerProcess("keyvald", "keyvald", offroad=True),
+  ManagerProcess("webportal", "python3", args=["-m", "bluepilot.backend.bp_portal"], onroad=True, offroad=True, callback=webportal_enabled),
   ManagerProcess("flowpilot", "./gradlew", args=["desktop:run"], rename=False, offroad=True, platform=["desktop"], pipe_std=False),
   ManagerProcess("pandad", "pandad", offroad=True),
   #ManagerProcess("loggerd", "./selfdrive/loggerd/loggerd", enabled=True, onroad=False, callback=logging),

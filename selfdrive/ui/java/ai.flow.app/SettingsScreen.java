@@ -137,6 +137,18 @@ public class SettingsScreen extends ScreenAdapter {
         AdditionalToggles.add("SensitiveSlow");
         AdditionalToggles.add("Always Use Model Path");
         AdditionalToggles.add("UseModelPath");
+        AdditionalToggles.add("Enable Web Portal");
+        AdditionalToggles.add("WebPortalEnabled");
+        AdditionalToggles.add("Web Bind All Interfaces");
+        AdditionalToggles.add("WebBindAll");
+
+        if (!params.exists("WebPortalEnabled")) {
+            params.putBool("WebPortalEnabled", true);
+        }
+
+        if (!params.exists("WebBindAll")) {
+            params.putBool("WebBindAll", true);
+        }
 
         stage = new Stage(new FitViewport(1280, 720));
         batch = new SpriteBatch();
