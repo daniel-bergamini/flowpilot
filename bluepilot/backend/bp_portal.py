@@ -279,9 +279,9 @@ def _get_recent_branches() -> list:
     if result.returncode == 0:
         for line in result.stdout.splitlines():
             parts = line.split("\x1f")
-            if len(parts) < 3:
+            if len(parts) < 2:
                 continue
-            date_ts = int(parts[2]) if parts[2].isdigit() else 0
+            date_ts = int(parts[2]) if len(parts) > 2 and parts[2].isdigit() else 0
             date_str = parts[3] if len(parts) > 3 else ""
             add_candidate(parts[0], parts[1], date_ts, date_str)
 
@@ -326,6 +326,27 @@ def _repo_is_dirty():
     return bool(result.stdout.strip())
 
 
+def _read_param_bytes(key: str) -> Optional[bytes]:
+    try:
+        value = params.get(key)
+        if value is None:
+            return None
+        if isinstance(value, bytes):
+            return value
+        if isinstance(value, str):
+            return value.encode("utf-8")
+        return None
+    except Exception:
+        try:
+            param_path = os.path.join("/data/params/d", key)
+            if os.path.exists(param_path):
+                with open(param_path, "rb") as fh:
+                    return fh.read()
+        except Exception:
+            return None
+    return None
+
+
 def _populate_flowpilot_panel(panel_data: dict) -> dict:
     try:
         branch_options = _get_recent_branches()
@@ -335,11 +356,9 @@ def _populate_flowpilot_panel(panel_data: dict) -> dict:
 
     branch_ref = None
     try:
-        branch_bytes = params.get(FLOWPILOT_BRANCH_PARAM)
-        if isinstance(branch_bytes, bytes):
+        branch_bytes = _read_param_bytes(FLOWPILOT_BRANCH_PARAM)
+        if branch_bytes:
             branch_ref = branch_bytes.decode('utf-8', errors='replace').strip()
-        elif isinstance(branch_bytes, str):
-            branch_ref = branch_bytes.strip()
     except Exception:
         branch_ref = None
 
