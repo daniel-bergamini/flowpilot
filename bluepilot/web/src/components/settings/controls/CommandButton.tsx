@@ -6,6 +6,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import type { CommandButtonControl } from '@/types/panels'
 import { usePanelStateStore } from '@/stores/usePanelStateStore'
+import { useChangeTrackingStore } from '@/stores/useChangeTrackingStore'
 import { panelAPI } from '@/services/panelAPI'
 import { getDynamicDescription } from '@/utils/conditionalEvaluator'
 import { Button, ControlCard, Modal, InputDialog, ConfirmDialog } from '@/components/common'
@@ -26,6 +27,9 @@ interface CommandButtonProps {
 
 export function CommandButton({ control, disabled, disabledReason }: CommandButtonProps) {
   const panelState = usePanelStateStore((state) => state.state)
+  const pendingChange = useChangeTrackingStore((state) =>
+    control.param ? state.getChangeForParam(control.param) : undefined
+  )
   const [showConfirm, setShowConfirm] = useState(false)
   const [showInput, setShowInput] = useState(false)
   const [showContent, setShowContent] = useState(false)
@@ -211,10 +215,11 @@ export function CommandButton({ control, disabled, disabledReason }: CommandButt
         }
       } else if (control.action) {
         // Execute panel command
+        const stagedValue = pendingChange?.newValue
         response = await panelAPI.executePanelCommand({
           action: control.action,
           param: control.param,
-          value: control.value,
+          value: stagedValue !== undefined ? stagedValue : control.value,
           params: control.params,
         })
       } else {

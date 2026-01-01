@@ -10,22 +10,34 @@
   "groups": [
     {
       "groupName": "flowpilotVersionGroup",
-      "title": "Flowpilot Version",
+      "title": "Flow Pilot Version",
       "enableResetButton": false,
       "controls": [
+        {
+          "type": "command_button",
+          "title": "Fetch Updates",
+          "desc": "Refresh commit, branch, and tag lists from remotes.",
+          "button_text": "FETCH",
+          "action": "flowpilot_git_sync",
+          "confirm": true,
+          "confirm_text": "Fetch updates from remotes now?",
+          "confirm_button_text": "Fetch",
+          "cancel_button_text": "Cancel"
+        },
         {
           "type": "selection",
           "param": "FlowpilotTargetRef",
           "title": "Target Commit",
-          "desc": "Select from the last 20 commits (chronological).",
+          "desc": "Select from the last 20 commits (newest first).",
           "options": []
         },
         {
           "type": "command_button",
-          "title": "Restart Flowpilot Back-End",
-          "desc": "Checkout the selected commit and restart Flowpilot services.",
+          "title": "Restart Flow Pilot Back-End",
+          "desc": "Checkout the selected ref and restart Flow Pilot services.",
           "button_text": "SWITCH & RESTART",
           "action": "flowpilot_checkout",
+          "param": "FlowpilotTargetRef",
           "confirm": true,
           "confirm_text": "This will checkout the selected commit and restart Flowpilot. Continue?",
           "confirm_button_text": "Switch & Restart",

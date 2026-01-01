@@ -189,7 +189,6 @@ def _get_recent_commits(limit: int = 20):
             "date": date_str,
             "subject": subject,
         })
-    commits.reverse()
     return commits
 
 
@@ -3287,17 +3286,20 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                         ref = data.get('ref') or data.get('value')
                         if not ref:
-                            ref_bytes = params.get(FLOWPILOT_TARGET_PARAM)
-                            if isinstance(ref_bytes, bytes):
-                                ref = ref_bytes.decode('utf-8', errors='replace').strip()
-                            elif isinstance(ref_bytes, str):
-                                ref = ref_bytes.strip()
+                            try:
+                                ref_bytes = params.get(FLOWPILOT_TARGET_PARAM)
+                                if isinstance(ref_bytes, bytes):
+                                    ref = ref_bytes.decode('utf-8', errors='replace').strip()
+                                elif isinstance(ref_bytes, str):
+                                    ref = ref_bytes.strip()
+                            except Exception:
+                                ref = None
 
                         if not ref:
                             self.send_json_response({
                                 'success': False,
                                 'error': 'No ref specified',
-                                'hint': f'Select a commit in {FLOWPILOT_TARGET_PARAM} first'
+                                'hint': f'Select a commit in {FLOWPILOT_TARGET_PARAM} and apply changes first'
                             }, 400)
                             return
 
@@ -3348,6 +3350,33 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                                 'success': False,
                                 'error': restart_msg
                             }, 500)
+
+                    elif action == 'flowpilot_git_sync':
+                        if is_onroad():
+                            self.send_json_response({
+                                'success': False,
+                                'error': 'Git sync not allowed while driving',
+                                'hint': 'Park the vehicle to fetch updates'
+                            }, 403)
+                            return
+
+                        fetch = subprocess.run(
+                            ["git", "-C", BASEDIR, "fetch", "--all", "--tags", "--prune"],
+                            capture_output=True,
+                            text=True,
+                        )
+                        if fetch.returncode != 0:
+                            err = (fetch.stderr or fetch.stdout or "git fetch failed").strip()
+                            self.send_json_response({
+                                'success': False,
+                                'error': err
+                            }, 500)
+                            return
+
+                        self.send_json_response({
+                            'success': True,
+                            'message': 'Fetched updates from remotes'
+                        })
 
                     elif action == 'manage_ssh_keys':
                         # Manage SSH keys (add/remove GitHub SSH keys)
