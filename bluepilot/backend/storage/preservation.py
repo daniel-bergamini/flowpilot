@@ -8,7 +8,7 @@ import os
 import time
 import logging
 from functools import lru_cache
-from typing import Optional
+from typing import Optional, List, Set, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ def has_preserve_xattr_segment(segment_path: str) -> bool:
         return False
 
 
-def get_preserved_segments_set(all_segment_paths: list[str]) -> set[str]:
+def get_preserved_segments_set(all_segment_paths: List[str]) -> Set[str]:
     """Calculate which segments are protected from deletion
 
     Mimics the logic from system/loggerd/deleter.py:get_preserved_segments()
@@ -196,7 +196,7 @@ def calculate_deletion_queue():
         }
 
 
-def calculate_route_deletion_risk(route_base: str, segments: list[dict], deletion_data: dict, disk_info: dict):
+def calculate_route_deletion_risk(route_base: str, segments: List[Dict], deletion_data: Dict, disk_info: Dict):
     """Calculate deletion risk for a specific route
 
     Args:

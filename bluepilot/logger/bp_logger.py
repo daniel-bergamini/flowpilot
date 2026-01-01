@@ -8,7 +8,7 @@ import traceback
 import platform
 from logging.handlers import RotatingFileHandler
 from enum import Enum
-from typing import Any
+from typing import Any, Dict, Optional
 from pathlib import Path
 
 from common.params import Params
@@ -110,7 +110,7 @@ def _ensure_log_directory(log_dir: str) -> bool:
     return False
 
 
-def initialize_logger(config: dict[str, Any] | None = None) -> logging.Logger:
+def initialize_logger(config: Optional[Dict[str, Any]] = None) -> logging.Logger:
   global _logger, _running, _worker_thread
 
   with _lock:

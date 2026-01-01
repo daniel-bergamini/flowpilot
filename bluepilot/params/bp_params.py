@@ -1,5 +1,5 @@
 import json
-from typing import Any
+from typing import Any, Dict
 from openpilot.common.params import Params, ParamKeyFlag, ParamKeyType
 from bluepilot.logger.bp_logger import debug, error
 
@@ -43,7 +43,7 @@ def log_debug(message: str) -> None:
     print(message)
 
 
-def load_params_json() -> dict[str, Any]:
+def load_params_json() -> Dict[str, Any]:
   """Get params data from cache or load from file if not yet loaded"""
   global _params_data
 
