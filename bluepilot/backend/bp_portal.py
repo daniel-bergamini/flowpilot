@@ -548,6 +548,7 @@ def _get_ui_build_status():
 
     src_dir = os.path.join(BASEDIR, "bluepilot", "web", "src")
     build_dir = os.path.join(BASEDIR, "bluepilot", "web", "public")
+    build_info_path = os.path.join(build_dir, "build-info.json")
 
     def latest_mtime(root: str) -> Optional[float]:
         latest = None
@@ -565,10 +566,58 @@ def _get_ui_build_status():
     src_mtime = latest_mtime(src_dir)
     build_mtime = latest_mtime(build_dir)
 
+    build_info = None
+    if os.path.exists(build_info_path):
+        try:
+            with open(build_info_path, "r") as fh:
+                build_info = json.load(fh)
+        except Exception:
+            build_info = None
+
+    head_commit = None
+    try:
+        result = subprocess.run(
+            ["git", "-C", BASEDIR, "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            head_commit = (result.stdout or "").strip() or None
+    except Exception:
+        head_commit = None
+
+    build_commit = None
+    build_branch = None
+    built_at = None
+    if isinstance(build_info, dict):
+        build_commit = build_info.get("commit") or None
+        build_branch = build_info.get("branch") or None
+        built_at = build_info.get("built_at") or None
+
+    stale = None
+    stale_reason = "unknown"
+    if build_commit and head_commit:
+        stale = build_commit != head_commit
+        stale_reason = "commit-mismatch"
+    elif src_mtime and build_mtime:
+        stale = src_mtime > build_mtime
+        stale_reason = "mtime"
+    elif src_mtime and not build_mtime:
+        stale = True
+        stale_reason = "missing-build"
+    elif build_mtime and not src_mtime:
+        stale = False
+        stale_reason = "missing-source"
+
     status = {
         "source_mtime": src_mtime,
         "build_mtime": build_mtime,
-        "stale": bool(src_mtime and build_mtime and src_mtime > build_mtime),
+        "stale": stale,
+        "stale_reason": stale_reason,
+        "build_commit": build_commit,
+        "build_branch": build_branch,
+        "build_time": built_at,
+        "head_commit": head_commit,
     }
     UI_BUILD_STATUS_CACHE["ts"] = now
     UI_BUILD_STATUS_CACHE["data"] = status

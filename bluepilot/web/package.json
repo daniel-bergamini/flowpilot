@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "preview:device": "VITE_BACKEND_URL=http://10.0.1.125:8088 vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postbuild": "node ./scripts/write-build-info.js"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.12",
