@@ -162,6 +162,7 @@ params = Params()
 
 FLOWPILOT_TARGET_PARAM = "FlowpilotTargetRef"
 FLOWPILOT_BRANCH_PARAM = "FlowpilotTargetBranch"
+UI_BUILD_STATUS_CACHE = {"ts": 0.0, "data": None}
 
 
 def _get_default_remote_ref() -> Optional[str]:
@@ -537,6 +538,41 @@ def restart_ui_process():
         logger.error(f"Failed to invoke pkill for UI restart: {exc}")
 
     return False, 'Unable to signal UI process'
+
+
+def _get_ui_build_status():
+    now = time.time()
+    cached = UI_BUILD_STATUS_CACHE.get("data")
+    if cached and (now - UI_BUILD_STATUS_CACHE.get("ts", 0.0) < 30):
+        return cached
+
+    src_dir = os.path.join(BASEDIR, "bluepilot", "web", "src")
+    build_dir = os.path.join(BASEDIR, "bluepilot", "web", "public")
+
+    def latest_mtime(root: str) -> Optional[float]:
+        latest = None
+        if not os.path.exists(root):
+            return None
+        for dirpath, _, filenames in os.walk(root):
+            for name in filenames:
+                try:
+                    mtime = os.path.getmtime(os.path.join(dirpath, name))
+                except OSError:
+                    continue
+                latest = mtime if latest is None else max(latest, mtime)
+        return latest
+
+    src_mtime = latest_mtime(src_dir)
+    build_mtime = latest_mtime(build_dir)
+
+    status = {
+        "source_mtime": src_mtime,
+        "build_mtime": build_mtime,
+        "stale": bool(src_mtime and build_mtime and src_mtime > build_mtime),
+    }
+    UI_BUILD_STATUS_CACHE["ts"] = now
+    UI_BUILD_STATUS_CACHE["data"] = status
+    return status
 
 # Disk space deletion thresholds
 try:
@@ -1180,6 +1216,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     '/api/health',
                     '/api/params',
                     '/api/system',
+                    '/api/ui',
                     '/api/logs',
                     '/api/manager-logs',
                     '/api/websocket_status',
@@ -1675,6 +1712,20 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     })
                 except Exception as e:
                     logger.exception("Error getting system metrics")
+                    self.send_json_response({
+                        'success': False,
+                        'error': str(e)
+                    }, 500)
+
+            elif path == '/api/ui/build-status':
+                try:
+                    status = _get_ui_build_status()
+                    self.send_json_response({
+                        'success': True,
+                        **status,
+                    })
+                except Exception as e:
+                    logger.error(f"Error getting UI build status: {e}", exc_info=True)
                     self.send_json_response({
                         'success': False,
                         'error': str(e)
