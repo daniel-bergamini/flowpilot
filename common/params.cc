@@ -30,6 +30,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"CarParams", CLEAR_ON_MANAGER_START | CLEAR_ON_IGNITION_ON},
     {"CarParamsCache", CLEAR_ON_MANAGER_START},
     {"FordSteerDriverAllowance", PERSISTENT},
+    {"FordLatCtlPrecisionMode", PERSISTENT},
     {"CalibrationParams", PERSISTENT},
     {"UserID", PERSISTENT},
     {"UserEmail", PERSISTENT},  

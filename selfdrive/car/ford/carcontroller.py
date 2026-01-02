@@ -1,5 +1,8 @@
 import math
+import time
+
 from cereal import car
+from common.params import Params
 from common.logger import sLogger
 from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
@@ -81,6 +84,26 @@ class CarController:
     self.tja_msg = 0
     self.tja_warn = 0
     self.hands = 0
+    self.params = Params()
+    self.precision_type = 0
+    self._last_precision_update = 0.0
+
+  def _update_precision_type(self):
+    now = time.monotonic()
+    if now - self._last_precision_update < 1.0:
+      return
+    self._last_precision_update = now
+    try:
+      raw = self.params.get("FordLatCtlPrecisionMode")
+      if raw is None:
+        return
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1):
+        self.precision_type = value
+    except (ValueError, TypeError):
+      return
 
   def update(self, CC, sm, CS, now_nanos):
     can_sends = []
@@ -185,14 +208,15 @@ class CarController:
 
       self.apply_curvature_last = apply_curvature
 
+      self._update_precision_type()
       if self.CP.carFingerprint in CANFD_CARS:
         # TODO: extended mode
         mode = 1 if CC.latActive else 0
         counter = (self.frame // CarControllerParams.STEER_STEP) % 0x10
-        can_sends.append(create_lat_ctl2_msg(self.packer, mode, -path_offset, -path_angle,
+        can_sends.append(create_lat_ctl2_msg(self.packer, mode, self.precision_type, -path_offset, -path_angle,
                                              -apply_curvature, -desired_curvature_rate, counter))
       else:
-        can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, -path_offset, -path_angle,
+        can_sends.append(create_lat_ctl_msg(self.packer, CC.latActive, self.precision_type, -path_offset, -path_angle,
                                             -apply_curvature, -desired_curvature_rate))
 
     # send lka msg at 33Hz

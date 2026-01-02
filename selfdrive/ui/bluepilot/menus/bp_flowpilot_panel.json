@@ -25,6 +25,16 @@
             { "name": "2.5 Nm", "value": "2.5" },
             { "name": "3.0 Nm", "value": "3.0", "default": true }
           ]
+        },
+        {
+          "type": "selection",
+          "param": "FordLatCtlPrecisionMode",
+          "title": "Ford Lateral Precision Mode",
+          "desc": "Choose the lateral control precision. Comfortable reduces steering jerk; Precise is more direct.",
+          "options": [
+            { "name": "Comfortable", "value": "0", "default": true },
+            { "name": "Precise", "value": "1" }
+          ]
         }
       ]
     },

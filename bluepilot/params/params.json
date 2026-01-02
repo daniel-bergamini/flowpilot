@@ -112,6 +112,16 @@
       "enabled": true
     },
     {
+      "name": "FordLatCtlPrecisionMode",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "BPUseBluepilotAlerts",
       "default": true,
       "type": "bool",
