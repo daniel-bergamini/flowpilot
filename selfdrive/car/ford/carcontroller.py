@@ -92,6 +92,7 @@ class CarController:
     self.max_lateral_accel = MAX_LATERAL_ACCEL
     self.lane_line_bias = RIGHT_EDGE_BIAS_CURVATURE
     self.hud_enhancements = True
+    self.steer_rate_profile = 1
 
   def _update_precision_type(self):
     now = time.monotonic()
@@ -130,6 +131,23 @@ class CarController:
         raw = raw.decode("utf-8", errors="replace").strip()
       value = int(raw)
       self.lane_line_bias = value * LANE_LINE_BIAS_SCALE
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordSteerRateProfile")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1) and value != self.steer_rate_profile:
+        self.steer_rate_profile = value
+        if value == 0:
+          CarControllerParams.ANGLE_RATE_LIMIT_UP = CarControllerParams.LEGACY_ANGLE_RATE_LIMIT_UP
+          CarControllerParams.ANGLE_RATE_LIMIT_DOWN = CarControllerParams.LEGACY_ANGLE_RATE_LIMIT_DOWN
+        else:
+          CarControllerParams.ANGLE_RATE_LIMIT_UP = CarControllerParams.BLUEPILOT_ANGLE_RATE_LIMIT_UP
+          CarControllerParams.ANGLE_RATE_LIMIT_DOWN = CarControllerParams.BLUEPILOT_ANGLE_RATE_LIMIT_DOWN
     except (ValueError, TypeError):
       pass
     try:

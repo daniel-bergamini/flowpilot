@@ -72,6 +72,16 @@
         },
         {
           "type": "selection",
+          "param": "FordSteerRateProfile",
+          "title": "Steering Rate Profile",
+          "desc": "Curvature rate limits that control steering response. Bluepilot is more responsive; Legacy is smoother but slower.",
+          "options": [
+            { "name": "Bluepilot (default)", "value": "1", "default": true },
+            { "name": "Legacy", "value": "0" }
+          ]
+        },
+        {
+          "type": "selection",
           "param": "FordCanfdMaxLateralAccel",
           "title": "CAN-FD Lateral Accel Cap",
           "desc": "Max lateral acceleration cap for CAN-FD platforms. CAN-FD steering can apply more torque and safety limits don't account for road roll, so this reduces aggressive curvature on banked roads. Off disables the extra cap.",
