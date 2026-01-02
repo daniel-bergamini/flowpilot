@@ -27,7 +27,7 @@ def webportal_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
     return True
 
 procs = [
-  ManagerProcess("controlsd", "controlsd"),
+  ManagerProcess("controlsd", "controlsd", log_to_files=True),
   ManagerProcess("plannerd", "plannerd"),
   ManagerProcess("radard", "radard"),
   ManagerProcess("calibrationd", "calibrationd"),

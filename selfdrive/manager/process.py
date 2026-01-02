@@ -12,7 +12,8 @@ LOG_TO_FILES = os.getenv("LOG_TO_FILES")
 class ManagerProcess:
     def __init__(
         self, name: str, command: str, args: List[str]=[], enabled=True, onroad=True, offroad=False, 
-        callback=None, unkillable=False, platform=["android", "desktop"], rename=False, pipe_std=True):
+        callback=None, unkillable=False, platform=["android", "desktop"], rename=False, pipe_std=True,
+        log_to_files=False):
 
         self.name: str = name
         self.command: str = command
@@ -25,6 +26,7 @@ class ManagerProcess:
         self.platform = platform
         self.shell = rename
         self.pipe_std = pipe_std
+        self.log_to_files = log_to_files
 
         self.phandler = None
         self.proc = None
@@ -61,7 +63,7 @@ class ManagerProcess:
         stdout, stderr = None, subprocess.PIPE
         if not self.pipe_std:
             stdout = stderr = None
-        if LOG_TO_FILES:
+        if LOG_TO_FILES or self.log_to_files:
             os.makedirs(LOGPATH, exist_ok=True)
             stdout = open(os.path.join(LOGPATH, f"{self.name}.stdout"), "a")
             stderr = open(os.path.join(LOGPATH, f"{self.name}.stderr"), "a")
