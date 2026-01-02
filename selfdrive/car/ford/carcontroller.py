@@ -91,6 +91,7 @@ class CarController:
     self._last_precision_update = 0.0
     self.max_lateral_accel = MAX_LATERAL_ACCEL
     self.lane_line_bias = RIGHT_EDGE_BIAS_CURVATURE
+    self.hud_enhancements = True
 
   def _update_precision_type(self):
     now = time.monotonic()
@@ -129,6 +130,17 @@ class CarController:
         raw = raw.decode("utf-8", errors="replace").strip()
       value = int(raw)
       self.lane_line_bias = value * LANE_LINE_BIAS_SCALE
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordBpHudEnhancements")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1):
+        self.hud_enhancements = bool(value)
     except (ValueError, TypeError):
       pass
 
@@ -263,28 +275,35 @@ class CarController:
       can_sends.append(create_acc_msg(self.packer, CC.longActive, gas, accel, stopping))
 
     ### ui ###
-    dm_state = None
-    try:
-      dm_state = sm['driverMonitoringState']
-    except Exception:
+    if self.hud_enhancements:
       dm_state = None
-    self.tja_msg, self.tja_warn, self.hands = compute_dm_msg_values(
-      dm_state, hud_control, self.send_hands_free_cluster_msg, main_on, CS.out.cruiseState.standstill
-    )
-    if steer_alert:
-      self.hands = 1
-    elif not self.send_hands_free_cluster_msg:
-      self.hands = 0
+      try:
+        dm_state = sm['driverMonitoringState']
+      except Exception:
+        dm_state = None
+      self.tja_msg, self.tja_warn, self.hands = compute_dm_msg_values(
+        dm_state, hud_control, self.send_hands_free_cluster_msg, main_on, CS.out.cruiseState.standstill
+      )
+      if steer_alert:
+        self.hands = 1
+      elif not self.send_hands_free_cluster_msg:
+        self.hands = 0
+    else:
+      self.hands = 1 if steer_alert else 0
+      self.tja_warn = CS.acc_tja_status_stock_values.get("TjaWarn_D_Rq", 0)
+      self.tja_msg = CS.acc_tja_status_stock_values.get("TjaMsgTxt_D_Dsply", 0)
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)
     # send lkas ui msg at 1Hz or if ui state changes
     if (self.frame % CarControllerParams.LKAS_UI_STEP) == 0 or send_ui:
       can_sends.append(create_lkas_ui_msg(self.packer, main_on, CC.latActive, self.hands, hud_control, CS.lkas_status_stock_values))
     # send acc ui msg at 5Hz or if ui state changes
     if (self.frame % CarControllerParams.ACC_UI_STEP) == 0 or send_ui:
+      send_hands_free = self.send_hands_free_cluster_msg if self.hud_enhancements else False
       can_sends.append(create_acc_ui_msg(self.packer, self.CP, main_on, CC.latActive,
                                          CS.out.cruiseState.standstill, hud_control,
-                                         CS.acc_tja_status_stock_values, self.send_hands_free_cluster_msg,
-                                         self.tja_warn, self.tja_msg))
+                                         CS.acc_tja_status_stock_values, send_hands_free,
+                                         self.tja_warn, self.tja_msg,
+                                         use_legacy_status=not self.hud_enhancements))
 
     self.main_on_last = main_on
     self.lkas_enabled_last = CC.latActive

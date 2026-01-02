@@ -37,6 +37,12 @@
           ]
         },
         {
+          "type": "toggle",
+          "param": "FordBpHudEnhancements",
+          "title": "Bluepilot HUD Enhancements",
+          "desc": "Enable Bluepilot-style HUD messaging for hands-on alerts and lane centering status."
+        },
+        {
           "type": "selection",
           "param": "FordCanfdMaxLateralAccel",
           "title": "CAN-FD Lateral Accel Cap",

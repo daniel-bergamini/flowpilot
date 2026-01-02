@@ -126,7 +126,8 @@ def create_acc_msg(packer, long_active: bool, gas: float, accel: float, stopping
 
 
 def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool, hud_control,
-                      stock_values: dict, send_hands_free_msg: bool = False, tja_warn: int = 0, tja_msg: int = 0):
+                      stock_values: dict, send_hands_free_msg: bool = False, tja_warn: int = 0, tja_msg: int = 0,
+                      use_legacy_status: bool = False):
   """
   Creates a CAN message for the Ford IPC adaptive cruise, forward collision warning and traffic jam
   assist status.
@@ -153,10 +154,10 @@ def create_acc_ui_msg(packer, CP, main_on: bool, enabled: bool, standstill: bool
       status = 6  # ActiveWarningRight
     else:
       status = 1  # Standby
-  elif standstill:
+  elif standstill and not use_legacy_status:
     status = 0  # Off
   else:
-    status = 1    # Standby
+    status = 0 if use_legacy_status else 1    # Standby
 
   values = {s: stock_values[s] for s in [
     "HaDsply_No_Cs",
