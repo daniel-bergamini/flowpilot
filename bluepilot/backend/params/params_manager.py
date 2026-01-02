@@ -490,13 +490,13 @@ def set_param_value(key: str, value: Any, params: Optional[Params] = None) -> Di
             bool_value = value if isinstance(value, bool) else value.lower() == "true"
             params.put_bool(key, bool_value)
         elif target_type == 'int' and not isinstance(value, bool):
-            # For INT params, pass as Python int (Params API will convert to string)
+            # Params API expects bytes/string in this build.
             int_value = int(value) if not isinstance(value, int) else value
-            params.put(key, int_value)
+            params.put(key, str(int_value))
         elif target_type == 'float':
-            # For FLOAT params, pass as Python float (Params API will convert to string)
+            # Params API expects bytes/string in this build.
             float_value = float(value) if not isinstance(value, float) else value
-            params.put(key, float_value)
+            params.put(key, str(float_value))
         else:
             params.put(key, str(value))
 

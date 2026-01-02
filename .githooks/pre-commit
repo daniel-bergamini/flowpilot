@@ -74,4 +74,32 @@ PY
 
     git add bluepilot/web/public
   fi
+
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "python3 not found; cannot verify web build commit." >&2
+    exit 1
+  fi
+
+  if ! python3 - <<'PY'
+import json
+import os
+import subprocess
+
+build_info_path = os.path.join("bluepilot", "web", "public", "build-info.json")
+if not os.path.exists(build_info_path):
+    raise SystemExit(1)
+
+with open(build_info_path, "r") as fh:
+    data = json.load(fh)
+
+build_commit = (data.get("commit") or "").strip()
+head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+
+raise SystemExit(0 if build_commit == head and build_commit else 1)
+PY
+  then
+    echo "Bluepilot web build is stale or missing build-info.json." >&2
+    echo "Run 'npm run build' in bluepilot/web and re-run commit." >&2
+    exit 1
+  fi
 fi
