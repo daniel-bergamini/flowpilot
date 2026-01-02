@@ -49,6 +49,25 @@
             { "name": "2.8 m/s^2", "value": "2.8" },
             { "name": "3.2 m/s^2", "value": "3.2" }
           ]
+        },
+        {
+          "type": "selection",
+          "param": "FordLaneLineBias",
+          "title": "No-Lane-Line Bias",
+          "desc": "Bias when lane lines are not trusted. Units are 1e-4 curvature per step. Positive values bias right; negative bias left. Off disables the bias.",
+          "options": [
+            { "name": "Off", "value": "0" },
+            { "name": "Left 5", "value": "-5" },
+            { "name": "Left 4", "value": "-4" },
+            { "name": "Left 3", "value": "-3" },
+            { "name": "Left 2", "value": "-2" },
+            { "name": "Left 1", "value": "-1" },
+            { "name": "Right 1", "value": "1" },
+            { "name": "Right 2", "value": "2" },
+            { "name": "Right 3", "value": "3", "default": true },
+            { "name": "Right 4", "value": "4" },
+            { "name": "Right 5", "value": "5" }
+          ]
         }
       ]
     },

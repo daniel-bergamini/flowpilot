@@ -20,6 +20,7 @@ AVERAGE_ROAD_ROLL = 0.06  # ~3.4 degrees
 MAX_LATERAL_ACCEL = 3.0 - (EARTH_G * AVERAGE_ROAD_ROLL)
 # Small right-bias when lane lines are not trusted to avoid centering on unlined roads.
 RIGHT_EDGE_BIAS_CURVATURE = 0.0003
+LANE_LINE_BIAS_SCALE = 0.0001
 PATH_OFFSET_LOOKAHEAD = 0.2
 PATH_OFFSET_MAX = 2.0
 PATH_ANGLE_MAX = 0.5
@@ -89,6 +90,7 @@ class CarController:
     self.precision_type = 0
     self._last_precision_update = 0.0
     self.max_lateral_accel = MAX_LATERAL_ACCEL
+    self.lane_line_bias = RIGHT_EDGE_BIAS_CURVATURE
 
   def _update_precision_type(self):
     now = time.monotonic()
@@ -117,6 +119,16 @@ class CarController:
         self.max_lateral_accel = value
       else:
         self.max_lateral_accel = None
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordLaneLineBias")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      self.lane_line_bias = value * LANE_LINE_BIAS_SCALE
     except (ValueError, TypeError):
       pass
 
@@ -150,7 +162,7 @@ class CarController:
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
         lane_line_bias = 0.0
         if CC.latActive and not sm['lateralPlan'].useLaneLines:
-          lane_line_bias = -RIGHT_EDGE_BIAS_CURVATURE
+          lane_line_bias = -self.lane_line_bias
         desired_curvature_rate = 0.0
         path_offset = 0.0
         path_angle = 0.0

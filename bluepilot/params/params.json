@@ -132,6 +132,16 @@
       "enabled": true
     },
     {
+      "name": "FordLaneLineBias",
+      "default": 3,
+      "min": -5,
+      "max": 5,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "BPUseBluepilotAlerts",
       "default": true,
       "type": "bool",
