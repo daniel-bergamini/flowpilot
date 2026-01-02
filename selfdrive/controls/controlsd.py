@@ -64,6 +64,7 @@ class Controls:
     # Ensure the current branch is cached, otherwise the first iteration of controlsd lags
     self.branch = get_short_branch("")
     self.params = Params()
+    self._last_ford_heartbeat_ts = 0.0
 
     # Setup sockets
     self.pm = pm
@@ -743,6 +744,19 @@ class Controls:
       self.rk.monitor_time()
 
       # TODO: remove this after testing
+      now = sec_since_boot()
+      if self.params.get_bool("FordCcInhibitHeartbeat") and (now - self._last_ford_heartbeat_ts) >= 0.1:
+        inhibiting = [
+          EVENT_NAME[e] for e in self.events.events
+          if any(et in EVENTS.get(e, {}) for et in (ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.SOFT_DISABLE,
+                                                    ET.PERMANENT, ET.USER_DISABLE))
+        ]
+        if inhibiting:
+          sLogger.Send(f"0Ford Flow Pilot Inhibit:{','.join(inhibiting)}")
+        else:
+          sLogger.Send("0Ford Flow Pilot OK")
+        self._last_ford_heartbeat_ts = now
+
       if self.i % 500 == 0:
         print("---------------")
         for event in self.events.events:
@@ -750,16 +764,6 @@ class Controls:
         print('enabled:', self.enabled)
         print('current alerts:', self.current_alert)
         print('timer_now:', sec_since_boot())
-        if self.params.get_bool("FordCcInhibitHeartbeat"):
-          inhibiting = [
-            EVENT_NAME[e] for e in self.events.events
-            if any(et in EVENTS.get(e, {}) for et in (ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.SOFT_DISABLE,
-                                                      ET.PERMANENT, ET.USER_DISABLE))
-          ]
-          if inhibiting:
-            sLogger.Send(f"0Ford Flow Pilot Inhibit:{','.join(inhibiting)}")
-          else:
-            sLogger.Send("0Ford Flow Pilot OK")
         print("---------------")
       self.i += 1
 
