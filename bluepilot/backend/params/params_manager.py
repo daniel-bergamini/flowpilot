@@ -373,6 +373,14 @@ def get_all_params(params: Optional[Params] = None) -> Dict[str, Any]:
         except Exception as e:
             logger.error(f"Error listing params directory: {e}")
             param_keys = []
+        # Include BluePilot-defined params even if missing from the params dir.
+        try:
+            bp_params = _load_bluepilot_params()
+            for key in bp_params:
+                if key not in param_keys:
+                    param_keys.append(key)
+        except Exception as e:
+            logger.debug(f"Failed to load BluePilot params for listing: {e}")
     else:
         # Fallback to known params
         param_keys = []
