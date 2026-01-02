@@ -39,6 +39,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"MadsUnifiedEngagementMode", PERSISTENT},
     {"MadsSteeringMode", PERSISTENT},
     {"FordLkasButtonEvents", PERSISTENT},
+    {"FordCcInhibitHeartbeat", PERSISTENT},
     {"CalibrationParams", PERSISTENT},
     {"UserID", PERSISTENT},
     {"UserEmail", PERSISTENT},  

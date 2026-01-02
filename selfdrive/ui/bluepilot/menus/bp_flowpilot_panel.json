@@ -49,6 +49,12 @@
           "desc": "Send lane-centering button events for MADS toggling. Disable to ignore the steering wheel LC button."
         },
         {
+          "type": "toggle",
+          "param": "FordCcInhibitHeartbeat",
+          "title": "Inhibiting Events Heartbeat",
+          "desc": "Append inhibiting events to the Ford controller heartbeat log line."
+        },
+        {
           "type": "selection",
           "param": "FordCanfdMaxLateralAccel",
           "title": "CAN-FD Lateral Accel Cap",

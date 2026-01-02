@@ -313,7 +313,4 @@ class CarController:
     new_actuators.curvature = self.apply_curvature_last
 
     self.frame += 1
-    if (self.frame % 10) == 0:
-      # Send a debug heartbeat so the Android UI doesn't show "System Unresponsive".
-      sLogger.Send("0ford cc ok")
     return new_actuators, can_sends

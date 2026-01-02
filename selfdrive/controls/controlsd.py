@@ -9,6 +9,7 @@ from common.numpy_fast import clip
 from common.realtime import sec_since_boot, config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from common.profiler import Profiler
 from common.params import Params, put_nonblocking
+from common.logger import sLogger
 import cereal.messaging as messaging
 from common.conversions import Conversions as CV
 from panda import ALTERNATIVE_EXPERIENCE
@@ -24,7 +25,7 @@ from selfdrive.controls.lib.latcontrol_pid import LatControlPID
 from selfdrive.controls.lib.latcontrol_indi import LatControlINDI
 from selfdrive.controls.lib.latcontrol_angle import LatControlAngle, STEER_ANGLE_SATURATION_THRESHOLD
 from selfdrive.controls.lib.latcontrol_torque import LatControlTorque
-from selfdrive.controls.lib.events import Events, ET, EVENT_NAME
+from selfdrive.controls.lib.events import Events, ET, EVENT_NAME, EVENTS
 from selfdrive.controls.lib.alertmanager import AlertManager, set_offroad_alert
 from selfdrive.controls.lib.vehicle_model import VehicleModel
 from system.hardware import HARDWARE
@@ -749,6 +750,16 @@ class Controls:
         print('enabled:', self.enabled)
         print('current alerts:', self.current_alert)
         print('timer_now:', sec_since_boot())
+        if self.params.get_bool("FordCcInhibitHeartbeat"):
+          inhibiting = [
+            EVENT_NAME[e] for e in self.events.events
+            if any(et in EVENTS.get(e, {}) for et in (ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.SOFT_DISABLE,
+                                                      ET.PERMANENT, ET.USER_DISABLE))
+          ]
+          if inhibiting:
+            sLogger.Send(f"0Ford Flow Pilot Inhibit:{','.join(inhibiting)}")
+          else:
+            sLogger.Send("0Ford Flow Pilot OK")
         print("---------------")
       self.i += 1
 

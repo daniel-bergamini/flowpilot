@@ -192,6 +192,14 @@
       "enabled": true
     },
     {
+      "name": "FordCcInhibitHeartbeat",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "BPUseBluepilotAlerts",
       "default": true,
       "type": "bool",
