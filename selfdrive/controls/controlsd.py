@@ -781,9 +781,11 @@ class Controls:
           else:
             indicator = f" {number}"
         if inhibiting:
-          sLogger.Send(f"0Ford Flow Pilot Inhibit:{','.join(inhibiting)}{indicator}")
+          sLogger.Send(f"0Ford Flow Pilot INHIBITED:{','.join(inhibiting)}{indicator}")
+        elif self.active:
+          sLogger.Send(f"0Ford Flow Pilot ENGAGED{indicator}")
         else:
-          sLogger.Send(f"0Ford Flow Pilot OK{indicator}")
+          sLogger.Send(f"0Ford Flow Pilot READY{indicator}")
         self._last_ford_heartbeat_ts = now
 
       if self.i % 500 == 0:
