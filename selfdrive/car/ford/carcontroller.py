@@ -31,7 +31,8 @@ LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 
 
-def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, is_canfd, bias=0.0):
+def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, is_canfd,
+                                max_lateral_accel, bias=0.0):
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature = clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
@@ -43,9 +44,9 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
   apply_curvature += bias
   apply_curvature = clip(apply_curvature, -CarControllerParams.CURVATURE_MAX, CarControllerParams.CURVATURE_MAX)
 
-  if is_canfd:
+  if is_canfd and max_lateral_accel is not None:
     # Conservative max lateral accel limit for CAN-FD platforms.
-    curvature_accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1.0) ** 2)
+    curvature_accel_limit = max_lateral_accel / (max(v_ego_raw, 1.0) ** 2)
     apply_curvature = clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit)
 
   return apply_curvature
@@ -87,6 +88,7 @@ class CarController:
     self.params = Params()
     self.precision_type = 0
     self._last_precision_update = 0.0
+    self.max_lateral_accel = MAX_LATERAL_ACCEL
 
   def _update_precision_type(self):
     now = time.monotonic()
@@ -96,14 +98,27 @@ class CarController:
     try:
       raw = self.params.get("FordLatCtlPrecisionMode")
       if raw is None:
-        return
+        raw = ""
       if isinstance(raw, bytes):
         raw = raw.decode("utf-8", errors="replace").strip()
       value = int(raw)
       if value in (0, 1):
         self.precision_type = value
     except (ValueError, TypeError):
-      return
+      pass
+    try:
+      raw = self.params.get("FordCanfdMaxLateralAccel")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = float(raw)
+      if value > 0.0:
+        self.max_lateral_accel = value
+      else:
+        self.max_lateral_accel = None
+    except (ValueError, TypeError):
+      pass
 
   def update(self, CC, sm, CS, now_nanos):
     can_sends = []
@@ -129,6 +144,7 @@ class CarController:
     ### lateral control ###
     # send steer msg at 20Hz
     if (self.frame % CarControllerParams.STEER_STEP) == 0:
+      self._update_precision_type()
       if CC.latActive:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
@@ -176,7 +192,7 @@ class CarController:
 
         requested_curvature = apply_ford_curvature_limits(requested_curvature, self.apply_curvature_last, current_curvature,
                                                           CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
-                                                          bias=lane_line_bias)
+                                                          self.max_lateral_accel, bias=lane_line_bias)
         reset_steering = CS.out.steeringPressed
         if reset_steering:
           self.post_reset_ramp_active = False
@@ -208,7 +224,6 @@ class CarController:
 
       self.apply_curvature_last = apply_curvature
 
-      self._update_precision_type()
       if self.CP.carFingerprint in CANFD_CARS:
         # TODO: extended mode
         mode = 1 if CC.latActive else 0

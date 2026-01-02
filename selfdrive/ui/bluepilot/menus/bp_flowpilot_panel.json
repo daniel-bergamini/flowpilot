@@ -35,6 +35,20 @@
             { "name": "Comfortable", "value": "0", "default": true },
             { "name": "Precise", "value": "1" }
           ]
+        },
+        {
+          "type": "selection",
+          "param": "FordCanfdMaxLateralAccel",
+          "title": "CAN-FD Lateral Accel Cap",
+          "desc": "Max lateral acceleration cap for CAN-FD platforms. CAN-FD steering can apply more torque and safety limits don't account for road roll, so this reduces aggressive curvature on banked roads. Off disables the extra cap.",
+          "options": [
+            { "name": "Off", "value": "0" },
+            { "name": "2.0 m/s^2", "value": "2.0" },
+            { "name": "2.2 m/s^2", "value": "2.2" },
+            { "name": "2.41 m/s^2", "value": "2.41", "default": true },
+            { "name": "2.8 m/s^2", "value": "2.8" },
+            { "name": "3.2 m/s^2", "value": "3.2" }
+          ]
         }
       ]
     },
