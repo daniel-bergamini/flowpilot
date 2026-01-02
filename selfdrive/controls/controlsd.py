@@ -764,22 +764,27 @@ class Controls:
           if isinstance(mode, bytes):
             mode = mode.decode("utf-8", errors="replace").strip()
           mode = int(mode or 0)
+          arrow_slots = 5
           if mode == 1:
             value = self._last_lat_accel
             max_value = self.CP.maxLateralAccel if self.CP.maxLateralAccel > 0 else 3.0
-            number = f"{abs(value):.2f}"
+            number = f"{abs(value):05.2f}"
           else:
             value = self._last_curvature
             max_value = 0.02
-            number = f"{abs(value):.4f}"
+            number = f"{abs(value):06.4f}"
           ratio = min(abs(value) / max(max_value, 1e-3), 1.0)
-          arrows = max(1, int(round(ratio * 5))) if abs(value) > 0 else 0
+          arrows = max(1, int(round(ratio * arrow_slots))) if abs(value) > 0 else 0
           if value < 0:
-            indicator = f" {'<' * arrows}{number}"
+            left = "<" * arrows
+            right = " " * arrow_slots
           elif value > 0:
-            indicator = f" {number}{'>' * arrows}"
+            left = " " * arrow_slots
+            right = ">" * arrows
           else:
-            indicator = f" {number}"
+            left = " " * arrow_slots
+            right = " " * arrow_slots
+          indicator = f" {left}{number}{right}"
         if inhibiting:
           sLogger.Send(f"0Ford Flow Pilot INHIBITED:{','.join(inhibiting)}{indicator}")
         elif self.active:
