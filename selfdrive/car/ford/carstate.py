@@ -25,6 +25,8 @@ class CarState(CarStateBase):
     self._last_allowance_update = 0.0
     self.mads_enabled = True
     self._last_mads_update = 0.0
+    self.lkas_button_events_enabled = True
+    self._last_lkas_button_events_update = 0.0
 
     self.vehicle_sensors_valid = False
     self.hybrid_platform = False
@@ -59,6 +61,23 @@ class CarState(CarStateBase):
       value = int(raw)
       if value in (0, 1):
         self.mads_enabled = bool(value)
+    except (ValueError, TypeError):
+      return
+
+  def _update_lkas_button_events_enabled(self):
+    now = time.monotonic()
+    if now - self._last_lkas_button_events_update < 1.0:
+      return
+    self._last_lkas_button_events_update = now
+    try:
+      raw = self.params.get("FordLkasButtonEvents")
+      if raw is None:
+        return
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1):
+        self.lkas_button_events_enabled = bool(value)
     except (ValueError, TypeError):
       return
 
@@ -131,10 +150,11 @@ class CarState(CarStateBase):
     ret.rightBlinker = cp.vl["Steering_Data_FD1"]["TurnLghtSwtch_D_Stat"] == 2
     # TODO: block this going to the camera otherwise it will enable stock TJA
     self._update_mads_enabled()
+    self._update_lkas_button_events_enabled()
     prev_lc_button = self.lc_button
     self.lc_button = bool(cp.vl["Steering_Data_FD1"]["TjaButtnOnOffPress"])
     ret.genericToggle = self.lc_button
-    if self.lc_button != prev_lc_button and self.mads_enabled:
+    if self.lc_button != prev_lc_button and self.mads_enabled and self.lkas_button_events_enabled:
       # Flowpilot doesn't have a dedicated LKAS button enum; map to altButton1.
       ret.buttonEvents = [
         create_button_event(int(self.lc_button), int(prev_lc_button), {1: ButtonType.altButton1})

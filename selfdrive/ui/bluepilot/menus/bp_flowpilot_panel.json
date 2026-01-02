@@ -43,6 +43,12 @@
           "desc": "Enable Bluepilot-style HUD messaging for hands-on alerts and lane centering status."
         },
         {
+          "type": "toggle",
+          "param": "FordLkasButtonEvents",
+          "title": "Lane Centering Button Events",
+          "desc": "Send lane-centering button events for MADS toggling. Disable to ignore the steering wheel LC button."
+        },
+        {
           "type": "selection",
           "param": "FordCanfdMaxLateralAccel",
           "title": "CAN-FD Lateral Accel Cap",
