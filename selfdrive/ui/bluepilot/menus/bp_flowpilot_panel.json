@@ -55,6 +55,22 @@
           "desc": "Append inhibiting events to the Ford controller heartbeat log line."
         },
         {
+          "type": "toggle",
+          "param": "FordCcSteerIndicator",
+          "title": "Steering Indicator in Heartbeat",
+          "desc": "Show steering direction/effort next to the Ford controller heartbeat."
+        },
+        {
+          "type": "selection",
+          "param": "FordCcSteerIndicatorMode",
+          "title": "Steering Indicator Source",
+          "desc": "Choose the indicator source for the heartbeat display.",
+          "options": [
+            { "name": "Curvature (commanded)", "value": "0", "default": true },
+            { "name": "Lateral Accel (desired)", "value": "1" }
+          ]
+        },
+        {
           "type": "selection",
           "param": "FordCanfdMaxLateralAccel",
           "title": "CAN-FD Lateral Accel Cap",

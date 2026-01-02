@@ -65,6 +65,8 @@ class Controls:
     self.branch = get_short_branch("")
     self.params = Params()
     self._last_ford_heartbeat_ts = 0.0
+    self._last_curvature = 0.0
+    self._last_lat_accel = 0.0
 
     # Setup sockets
     self.pm = pm
@@ -513,6 +515,11 @@ class Controls:
                                                                              self.last_actuators, self.steer_limited, self.desired_curvature,
                                                                              self.desired_curvature_rate, self.sm['liveLocationKalman'])
       actuators.curvature = self.desired_curvature
+      self._last_curvature = float(actuators.curvature)
+      try:
+        self._last_lat_accel = float(lac_log.desiredLateralAccel)
+      except Exception:
+        pass
     else:
       lac_log = log.ControlsState.LateralDebugState.new_message()
       if self.sm.rcv_frame['testJoystick'] > 0:
@@ -751,10 +758,32 @@ class Controls:
           if any(et in EVENTS.get(e, {}) for et in (ET.NO_ENTRY, ET.IMMEDIATE_DISABLE, ET.SOFT_DISABLE,
                                                     ET.PERMANENT, ET.USER_DISABLE))
         ]
+        indicator = ""
+        if self.params.get_bool("FordCcSteerIndicator"):
+          mode = self.params.get("FordCcSteerIndicatorMode")
+          if isinstance(mode, bytes):
+            mode = mode.decode("utf-8", errors="replace").strip()
+          mode = int(mode or 0)
+          if mode == 1:
+            value = self._last_lat_accel
+            max_value = self.CP.maxLateralAccel if self.CP.maxLateralAccel > 0 else 3.0
+            number = f"{abs(value):.2f}"
+          else:
+            value = self._last_curvature
+            max_value = 0.02
+            number = f"{abs(value):.4f}"
+          ratio = min(abs(value) / max(max_value, 1e-3), 1.0)
+          arrows = max(1, int(round(ratio * 5))) if abs(value) > 0 else 0
+          if value < 0:
+            indicator = f" {'<' * arrows}{number}"
+          elif value > 0:
+            indicator = f" {number}{'>' * arrows}"
+          else:
+            indicator = f" {number}"
         if inhibiting:
-          sLogger.Send(f"0Ford Flow Pilot Inhibit:{','.join(inhibiting)}")
+          sLogger.Send(f"0Ford Flow Pilot Inhibit:{','.join(inhibiting)}{indicator}")
         else:
-          sLogger.Send("0Ford Flow Pilot OK")
+          sLogger.Send(f"0Ford Flow Pilot OK{indicator}")
         self._last_ford_heartbeat_ts = now
 
       if self.i % 500 == 0:
