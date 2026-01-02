@@ -150,6 +150,40 @@
       "enabled": true
     },
     {
+      "name": "Mads",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "MadsMainCruiseAllowed",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "MadsUnifiedEngagementMode",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "MadsSteeringMode",
+      "default": 0,
+      "min": 0,
+      "max": 2,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "BPUseBluepilotAlerts",
       "default": true,
       "type": "bool",
