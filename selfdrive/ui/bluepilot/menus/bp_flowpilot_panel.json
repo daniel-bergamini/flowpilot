@@ -38,6 +38,17 @@
         },
         {
           "type": "toggle",
+          "param": "FordEnableBpLanePositioning",
+          "title": "BluePilot Lane Positioning Pipeline",
+          "desc": "Enable the BluePilot lane positioning pipeline. Use the Steering panel Lane Positioning controls to tune.",
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          }
+        },
+        {
+          "type": "toggle",
           "param": "FordBpHudEnhancements",
           "title": "Bluepilot HUD Enhancements",
           "desc": "Enable Bluepilot-style HUD messaging for hands-on alerts and lane centering status."

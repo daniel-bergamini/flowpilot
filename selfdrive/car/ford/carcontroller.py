@@ -3,6 +3,7 @@ import time
 
 from cereal import car
 from common.params import Params
+from common.pid import PIDController
 from common.logger import sLogger
 from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
@@ -27,6 +28,16 @@ PATH_ANGLE_MAX = 0.5
 LANE_CONFIDENCE_BP = [0.6, 0.8]
 LANE_CHANGE_FACTOR_BP = [4.4, 40.23]
 LANE_CHANGE_FACTOR_V = [0.95, 0.85]
+LANE_WIDTH_TOLERANCE_BP = [3.75, 4.25]
+LANE_WIDTH_TOLERANCE_V = [0.81, 0.59]
+LC_PID_SPEED_BP = [0.0, 9.0, 15.0]
+LC_PID_SPEED_V = [0.0, 0.0, 1.0]
+LC_PATH_ANGLE_ROC_BP = [5.0, 15.0, 25.0]
+LC_PATH_ANGLE_ROC_V = [0.003, 0.0015, 0.002]
+POST_LANE_CHANGE_FRAMES = 160
+POST_LANE_CHANGE_MAX_PATH_ANGLE_CHANGE = 0.00125
+POST_LANE_CHANGE_MAX_PATH_OFFSET_CHANGE = 0.00125
+POST_LANE_CHANGE_MAX_CURVATURE_RATE_CHANGE = 0.0001
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
@@ -93,6 +104,25 @@ class CarController:
     self.lane_line_bias = RIGHT_EDGE_BIAS_CURVATURE
     self.hud_enhancements = True
     self.steer_rate_profile = 1
+    self.use_bp_lane_positioning = False
+    self.enable_lane_positioning = False
+    self.enable_lanefull_mode = False
+    self.custom_path_offset = 0.0
+    self.path_offset_lookup_time = PATH_OFFSET_LOOKAHEAD
+    self.lc_pid_gain_ui = 0.0
+    self.lc_pid_controller = PIDController(k_p=0.25, k_i=0.05, rate=20)
+    self.lc_path_angle_reset_counter = 0
+    self.lc_path_angle_reset_duration = 1.5
+    self.path_angle_last = 0.0
+    self.lane_change = False
+    self.lane_change_last = False
+    self.post_lane_change_active = False
+    self.post_lane_change_timer = 0
+    self.pre_lane_change_values = {
+      'path_angle': 0.0,
+      'path_offset': 0.0,
+      'desired_curvature_rate': 0.0,
+    }
 
   def _update_precision_type(self):
     now = time.monotonic()
@@ -161,6 +191,112 @@ class CarController:
         self.hud_enhancements = bool(value)
     except (ValueError, TypeError):
       pass
+    try:
+      raw = self.params.get("FordEnableBpLanePositioning")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1):
+        self.use_bp_lane_positioning = bool(value)
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordLatTuningEnableLanePositioning")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1):
+        self.enable_lane_positioning = bool(value)
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordLatTuningEnableLanefullMode")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = int(raw)
+      if value in (0, 1):
+        self.enable_lanefull_mode = bool(value)
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordLatTuningCustomPathOffset")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = float(raw)
+      if -0.5 <= value <= 0.5:
+        self.custom_path_offset = value
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordLatTuningLCPIDGainUI")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = float(raw)
+      if value >= 0.0:
+        self.lc_pid_gain_ui = value
+    except (ValueError, TypeError):
+      pass
+    try:
+      raw = self.params.get("FordLatTuningPathOffsetLookupTime")
+      if raw is None:
+        raw = ""
+      if isinstance(raw, bytes):
+        raw = raw.decode("utf-8", errors="replace").strip()
+      value = float(raw)
+      if 0.0 <= value <= 0.8:
+        self.path_offset_lookup_time = value
+    except (ValueError, TypeError):
+      pass
+
+  def _handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
+    if self.lane_change_last and not self.lane_change:
+      self.post_lane_change_active = True
+      self.post_lane_change_timer = 0
+      self.pre_lane_change_values = {
+        'path_angle': 0.0,
+        'path_offset': 0.0,
+        'desired_curvature_rate': 0.0,
+      }
+
+    self.lane_change_last = self.lane_change
+
+    if self.post_lane_change_active:
+      self.post_lane_change_timer += 1
+      new_path_angle = clip(
+        path_angle,
+        self.pre_lane_change_values['path_angle'] - POST_LANE_CHANGE_MAX_PATH_ANGLE_CHANGE,
+        self.pre_lane_change_values['path_angle'] + POST_LANE_CHANGE_MAX_PATH_ANGLE_CHANGE,
+      )
+      new_path_offset = clip(
+        path_offset,
+        self.pre_lane_change_values['path_offset'] - POST_LANE_CHANGE_MAX_PATH_OFFSET_CHANGE,
+        self.pre_lane_change_values['path_offset'] + POST_LANE_CHANGE_MAX_PATH_OFFSET_CHANGE,
+      )
+      new_curvature_rate = clip(
+        desired_curvature_rate,
+        self.pre_lane_change_values['desired_curvature_rate'] - POST_LANE_CHANGE_MAX_CURVATURE_RATE_CHANGE,
+        self.pre_lane_change_values['desired_curvature_rate'] + POST_LANE_CHANGE_MAX_CURVATURE_RATE_CHANGE,
+      )
+      self.pre_lane_change_values = {
+        'path_angle': new_path_angle,
+        'path_offset': new_path_offset,
+        'desired_curvature_rate': new_curvature_rate,
+      }
+      if self.post_lane_change_timer >= POST_LANE_CHANGE_FRAMES:
+        self.post_lane_change_active = False
+      return new_path_angle, new_path_offset, new_curvature_rate
+
+    return path_angle, path_offset, desired_curvature_rate
 
   def update(self, CC, sm, CS, now_nanos):
     can_sends = []
@@ -202,30 +338,91 @@ class CarController:
           desired_curvature_rate = 0.0
         desired_curvature_rate = clip(desired_curvature_rate, -0.001023, 0.001023)
 
+        reset_steering = CS.out.steeringPressed
         lane_change_active = sm['lateralPlan'].laneChangeState != 0
+        self.lane_change = lane_change_active
         if lane_change_active:
           desired_curvature_rate = 0.0
 
-        try:
-          model = sm['modelV2']
-          path_offset_position = interp(PATH_OFFSET_LOOKAHEAD, T_IDXS, model.position.y)
-          path_offset_lanelines = (model.laneLines[1].y[0] + model.laneLines[2].y[0]) / 2
-          laneline_confidence = min(model.laneLineProbs[1], model.laneLineProbs[2])
-          laneline_scale = interp(laneline_confidence, LANE_CONFIDENCE_BP, [0.0, 1.0])
-          if not sm['lateralPlan'].useLaneLines:
-            laneline_scale = 0.0
-          path_offset = (path_offset_position * (1.0 - laneline_scale)) + (path_offset_lanelines * laneline_scale)
-          if lane_change_active:
+        if self.use_bp_lane_positioning:
+          try:
+            model = sm['modelV2']
+            path_offset_position = interp(self.path_offset_lookup_time, T_IDXS, model.position.y)
+            path_offset_lanelines = (model.laneLines[1].y[0] + model.laneLines[2].y[0]) / 2
+            laneline_width = model.laneLines[2].y[0] + (-model.laneLines[1].y[0])
+            laneline_width_tolerance = interp(laneline_width, LANE_WIDTH_TOLERANCE_BP, LANE_WIDTH_TOLERANCE_V)
+            laneline_confidence = min(model.laneLineProbs[1], model.laneLineProbs[2], laneline_width_tolerance)
+            if not self.enable_lanefull_mode:
+              laneline_confidence = 0.0
+            laneline_scale = interp(laneline_confidence, LANE_CONFIDENCE_BP, [0.0, 1.0])
+            path_offset = (path_offset_position * (1.0 - laneline_scale)) + (path_offset_lanelines * laneline_scale)
+            path_offset += self.custom_path_offset
+            if lane_change_active:
+              path_offset = 0.0
+          except Exception:
             path_offset = 0.0
-        except Exception:
-          path_offset = 0.0
-        path_offset = clip(path_offset, -PATH_OFFSET_MAX, PATH_OFFSET_MAX)
+          path_offset = clip(path_offset, -PATH_OFFSET_MAX, PATH_OFFSET_MAX)
 
-        try:
-          path_angle = float(sm['lateralPlan'].psis[0])
-        except Exception:
-          path_angle = 0.0
-        path_angle = clip(path_angle, -PATH_ANGLE_MAX, PATH_ANGLE_MAX)
+          path_offset_error = path_offset * (self.lc_pid_gain_ui / 100.0)
+          lc_pid_speed_factor = interp(CS.out.vEgoRaw, LC_PID_SPEED_BP, LC_PID_SPEED_V)
+          path_offset_error_adj = path_offset_error * lc_pid_speed_factor
+          if not self.enable_lane_positioning:
+            path_offset_error_adj = 0.0
+            self.lc_pid_controller.reset()
+
+          path_angle_low_c = self.lc_pid_controller.update(path_offset_error_adj)
+          if not self.enable_lane_positioning:
+            path_angle_low_c = 0.0
+          if reset_steering:
+            path_angle_low_c = 0.0
+
+          path_angle_roc = interp(abs(CS.out.vEgoRaw), LC_PATH_ANGLE_ROC_BP, LC_PATH_ANGLE_ROC_V)
+          path_angle_low_c = clip(path_angle_low_c, self.path_angle_last - path_angle_roc, self.path_angle_last + path_angle_roc)
+
+          if reset_steering:
+            self.lc_path_angle_reset_counter += 1
+          else:
+            self.lc_path_angle_reset_counter = 0
+          if self.lc_path_angle_reset_counter > self.lc_path_angle_reset_duration * 20:
+            self.lc_pid_controller.reset()
+
+          path_angle = path_angle_low_c
+
+          path_angle, path_offset, desired_curvature_rate = self._handle_post_lane_change_transition(
+            path_angle, path_offset, desired_curvature_rate
+          )
+          if reset_steering:
+            path_angle = 0.0
+
+          desired_curvature_rate = clip(desired_curvature_rate, -0.001023, 0.001023)
+          path_offset = clip(path_offset, -PATH_OFFSET_MAX, PATH_OFFSET_MAX)
+          path_angle = clip(path_angle, -PATH_ANGLE_MAX, PATH_ANGLE_MAX)
+
+          # avoid sending path_offset when path_angle is used for centering
+          path_offset = 0.0
+        else:
+          try:
+            model = sm['modelV2']
+            path_offset_position = interp(PATH_OFFSET_LOOKAHEAD, T_IDXS, model.position.y)
+            path_offset_lanelines = (model.laneLines[1].y[0] + model.laneLines[2].y[0]) / 2
+            laneline_confidence = min(model.laneLineProbs[1], model.laneLineProbs[2])
+            laneline_scale = interp(laneline_confidence, LANE_CONFIDENCE_BP, [0.0, 1.0])
+            if not sm['lateralPlan'].useLaneLines:
+              laneline_scale = 0.0
+            path_offset = (path_offset_position * (1.0 - laneline_scale)) + (path_offset_lanelines * laneline_scale)
+            if lane_change_active:
+              path_offset = 0.0
+          except Exception:
+            path_offset = 0.0
+          path_offset = clip(path_offset, -PATH_OFFSET_MAX, PATH_OFFSET_MAX)
+
+          try:
+            path_angle = float(sm['lateralPlan'].psis[0])
+          except Exception:
+            path_angle = 0.0
+          path_angle = clip(path_angle, -PATH_ANGLE_MAX, PATH_ANGLE_MAX)
+
+        self.path_angle_last = path_angle
 
         requested_curvature = actuators.curvature
         if lane_change_active:
@@ -235,7 +432,6 @@ class CarController:
         requested_curvature = apply_ford_curvature_limits(requested_curvature, self.apply_curvature_last, current_curvature,
                                                           CS.out.vEgoRaw, self.CP.carFingerprint in CANFD_CARS,
                                                           self.max_lateral_accel, bias=lane_line_bias)
-        reset_steering = CS.out.steeringPressed
         if reset_steering:
           self.post_reset_ramp_active = False
           self.anti_overshoot_curvature_last = 0.0
