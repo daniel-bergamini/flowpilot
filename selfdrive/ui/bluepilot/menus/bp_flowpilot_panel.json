@@ -129,6 +129,31 @@
       ]
     },
     {
+      "groupName": "flowpilotCalibrationGroup",
+      "title": "Flow Pilot Calibration",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "command_button",
+          "title": "Reset Extrinsic Calibration",
+          "desc": "Clear the camera extrinsic calibration so it can be recalibrated.",
+          "button_text": "RESET",
+          "action": "set_param",
+          "param": "ResetExtrinsicCalibration",
+          "value": "true",
+          "confirm": true,
+          "confirm_text": "Reset extrinsic calibration now?",
+          "confirm_button_text": "Reset",
+          "cancel_button_text": "Cancel",
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "groupName": "flowpilotVersionGroup",
       "title": "Flow Pilot Version",
       "enableResetButton": false,
