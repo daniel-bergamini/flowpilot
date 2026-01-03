@@ -43,6 +43,7 @@ std::unordered_map<std::string, uint32_t> keys = {
     {"FordCcSteerIndicator", PERSISTENT},
     {"FordCcSteerIndicatorMode", PERSISTENT},
     {"FordSteerRateProfile", PERSISTENT},
+    {"ShowCenterCrosshair", PERSISTENT},
     {"CalibrationParams", PERSISTENT},
     {"UserID", PERSISTENT},
     {"UserEmail", PERSISTENT},  

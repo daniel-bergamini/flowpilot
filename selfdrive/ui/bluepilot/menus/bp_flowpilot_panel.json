@@ -116,6 +116,19 @@
       ]
     },
     {
+      "groupName": "flowpilotDisplayGroup",
+      "title": "Flow Pilot Display",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "ShowCenterCrosshair",
+          "title": "Center Crosshair Overlay",
+          "desc": "Show a center crosshair on the on-road camera view for mounting alignment."
+        }
+      ]
+    },
+    {
       "groupName": "flowpilotVersionGroup",
       "title": "Flow Pilot Version",
       "enableResetButton": false,

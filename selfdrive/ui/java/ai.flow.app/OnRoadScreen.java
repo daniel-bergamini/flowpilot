@@ -136,6 +136,8 @@ public class OnRoadScreen extends ScreenAdapter {
     float settingsBarWidth;
     boolean cameraMatrixUpdated = false;
     boolean isMetric;
+    boolean showCenterCrosshair = false;
+    float crosshairParamTimer = 0f;
     ByteBuffer imgBuffer;
     NV12Renderer nv12Renderer;
     Definitions.FrameBuffer.Reader msgframeBuffer;
@@ -753,6 +755,31 @@ public class OnRoadScreen extends ScreenAdapter {
         Gdx.gl.glDisable(Gdx.gl.GL_BLEND);
     }
 
+    public void updateCrosshairToggle(float delta) {
+        crosshairParamTimer -= delta;
+        if (crosshairParamTimer <= 0f) {
+            crosshairParamTimer = 1f;
+            showCenterCrosshair = params.existsAndCompare("ShowCenterCrosshair", true);
+        }
+    }
+
+    public void drawCenterCrosshair() {
+        float centerX = defaultImageWidth / 2f;
+        float centerY = defaultImageHeight / 2f;
+        float crosshairSize = 40f;
+        float crosshairWidth = 2f;
+
+        appContext.shapeRenderer.setProjectionMatrix(cameraModel.combined);
+        appContext.shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        Gdx.gl.glEnable(Gdx.gl.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        appContext.shapeRenderer.setColor(1f, 1f, 1f, 0.85f);
+        appContext.shapeRenderer.rectLine(centerX - crosshairSize, centerY, centerX + crosshairSize, centerY, crosshairWidth);
+        appContext.shapeRenderer.rectLine(centerX, centerY - crosshairSize, centerX, centerY + crosshairSize, crosshairWidth);
+        appContext.shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
     public void setUnits(){
         velocityUnitLabel.setText("mph");
     }
@@ -789,6 +816,10 @@ public class OnRoadScreen extends ScreenAdapter {
 
             if (modelAlive)
                 drawModelOutputs();
+
+            updateCrosshairToggle(delta);
+            if (showCenterCrosshair)
+                drawCenterCrosshair();
 
             // if we just got onroad, start by hiding the info on the side
             if (HideInfoTable) {
