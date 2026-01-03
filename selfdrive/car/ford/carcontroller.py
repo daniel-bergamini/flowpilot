@@ -3,7 +3,7 @@ import time
 
 from cereal import car
 from common.params import Params
-from common.pid import PIDController
+from selfdrive.controls.lib.pid import PIDController
 from common.logger import sLogger
 from common.numpy_fast import clip, interp
 from common.realtime import DT_CTRL
