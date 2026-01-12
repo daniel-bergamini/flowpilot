@@ -2,6 +2,7 @@
 from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
+from common.params import Params
 from selfdrive.car import STD_CARGO_KG, get_safety_config
 from selfdrive.car.ford.values import CAR, Ecu, CANFD_CARS, FordConfig
 from selfdrive.car.interfaces import CarInterfaceBase
@@ -11,6 +12,16 @@ GearShifter = car.CarState.GearShifter
 
 
 class CarInterface(CarInterfaceBase):
+  def __init__(self, CP, CarController, CarState):
+    params = Params()
+    use_bp = params.get_bool("FordUseBluepilotStack")
+    if use_bp:
+      from selfdrive.car.ford_bp.carcontroller import CarController as BpCarController
+      from selfdrive.car.ford_bp.carstate import CarState as BpCarState
+      super().__init__(CP, BpCarController, BpCarState)
+    else:
+      super().__init__(CP, CarController, CarState)
+
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     FordConfig.BLUECRUISE_CLUSTER_PRESENT = any(fw.ecu == Ecu.hud for fw in car_fw)

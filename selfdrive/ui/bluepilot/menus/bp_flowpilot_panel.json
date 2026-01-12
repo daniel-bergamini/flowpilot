@@ -155,6 +155,24 @@
       ]
     },
     {
+      "groupName": "flowpilotStackGroup",
+      "title": "Flow Pilot Ford Stack",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordUseBluepilotStack",
+          "title": "Use Bluepilot Ford Stack",
+          "desc": "Switch Ford control logic between the legacy Flow Pilot stack and the Bluepilot stack. Changing this requires a restart.",
+          "enableConditions": {
+            "allConditionsTrue": [
+              { "isOffroad": true, "reason": "Requires offroad" }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "groupName": "flowpilotVersionGroup",
       "title": "Flow Pilot Version",
       "enableResetButton": false,
