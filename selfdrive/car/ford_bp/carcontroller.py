@@ -9,7 +9,7 @@ from common.realtime import DT_CTRL
 from selfdrive.car import apply_hysteresis, apply_std_steer_angle_limits
 from selfdrive.controls.lib.vehicle_model import ACCELERATION_DUE_TO_GRAVITY
 from selfdrive.car.ford_bp import fordcan
-from selfdrive.car.ford.values import CarControllerParams, CAR, CANFD_CARS
+from selfdrive.car.ford.values import CarControllerParams, CAR, FordFlags
 from selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX
 from common.params import Params
 from selfdrive.modeld.constants import T_IDXS
@@ -65,7 +65,7 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
 
   # Ford Q4/CAN FD has more torque available compared to Q3/CAN so we limit it based on lateral acceleration.
   # Safety is not aware of the road roll so we subtract a conservative amount at all times
-  if CP.carFingerprint in CANFD_CARS:
+  if CP.flags & FordFlags.CANFD:
     # Limit curvature to conservative max lateral acceleration
     curvature_accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1) ** 2)
     apply_curvature = float(np.clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit))
@@ -371,7 +371,7 @@ class CarController:
           self.pc_blend_ratio_high_C =  self.pc_blend_ratio_high_C_UI
           self.LC_PID_GAIN = self.LC_PID_GAIN_UI
 
-        elif self.CP.carFingerprint in CANFD_CARS:
+        elif self.CP.flags & FordFlags.CANFD:
           self.pc_blend_ratio_low_C = self.pc_blend_ratio_low_C_CANFD
           self.pc_blend_ratio_high_C = self.pc_blend_ratio_high_C_CANFD
           if (self.CP.carFingerprint == CAR.FORD_ESCAPE_MK4_5 or self.CP.carFingerprint == CAR.FORD_MUSTANG_MACH_E_MK1):
@@ -676,7 +676,7 @@ class CarController:
       # set lat_active to the value of CC.latActive
       lat_active = CC.latActive
 
-      if self.CP.carFingerprint in CANFD_CARS:
+      if self.CP.flags & FordFlags.CANFD:
         # TODO: extended mode
         # Ford uses four individual signals to dictate how to drive to the car. Curvature alone (limited to 0.02m/s^2)
         # can actuate the steering for a large portion of any lateral movements. However, in order to get further control on

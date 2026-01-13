@@ -1,5 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
+from enum import IntFlag
 from typing import Dict, List, Set, Union
 
 from cereal import car
@@ -47,6 +48,13 @@ class CANBUS:
   main = 0
   radar = 1
   camera = 2
+
+
+class FordFlags(IntFlag):
+  CANFD = 1
+  ALT_STEER_ANGLE = 2
+  HEV_CLUSTER_DATA = 4
+  HEV_BATTERY_DATA = 8
 
 
 class CAR:
