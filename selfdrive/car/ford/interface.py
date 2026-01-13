@@ -3,8 +3,9 @@ from cereal import car
 from panda import Panda
 from common.conversions import Conversions as CV
 from common.params import Params
+from opendbc.can.can_define import CANDefine
 from selfdrive.car import STD_CARGO_KG, get_safety_config
-from selfdrive.car.ford.values import CAR, Ecu, CANFD_CARS, FordConfig, FordFlags
+from selfdrive.car.ford.values import CAR, Ecu, CANFD_CARS, FordConfig, FordFlags, DBC, CANBUS
 from selfdrive.car.interfaces import CarInterfaceBase
 
 TransmissionType = car.CarParams.TransmissionType
@@ -30,6 +31,14 @@ class CarInterface(CarInterfaceBase):
     if candidate in CANFD_CARS:
       ret.safetyConfigs[0].safetyParam |= Panda.FLAG_FORD_CANFD
       ret.flags |= FordFlags.CANFD.value
+
+    can_define = CANDefine(DBC[candidate]["pt"])
+    if "SteeringPinion_Data_Alt" in can_define.dv:
+      ret.flags |= FordFlags.ALT_STEER_ANGLE.value
+    if 869 in fingerprint[CANBUS.main]:
+      ret.flags |= FordFlags.HEV_CLUSTER_DATA.value
+    if all(msg_id in fingerprint[CANBUS.main] for msg_id in (122, 587, 588)):
+      ret.flags |= FordFlags.HEV_BATTERY_DATA.value
 
     # These cars are dashcam only for lack of test coverage.
     # Once a user confirms each car works and a test route is
