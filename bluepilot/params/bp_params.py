@@ -1,6 +1,6 @@
 import json
 from typing import Any, Dict
-from openpilot.common.params import Params, ParamKeyFlag, ParamKeyType
+from common.params import Params, ParamKeyType
 from bluepilot.logger.bp_logger import debug, error
 
 # Define the path to the params.json file
@@ -12,17 +12,17 @@ _params_data = None
 _cc_props_cache = {}
 _interface_props_cache = {}
 
-# Map the flag names to values using the new ParamKeyFlag enum values
+# Map the flag names to values using ParamKeyType enum values
 flag_mapping = {
-  "PERSISTENT": ParamKeyFlag.PERSISTENT,
-  "CLEAR_ON_MANAGER_START": ParamKeyFlag.CLEAR_ON_MANAGER_START,
-  "CLEAR_ON_ONROAD_TRANSITION": ParamKeyFlag.CLEAR_ON_ONROAD_TRANSITION,
-  "CLEAR_ON_OFFROAD_TRANSITION": ParamKeyFlag.CLEAR_ON_OFFROAD_TRANSITION,
-  "DONT_LOG": ParamKeyFlag.DONT_LOG,
-  "DEVELOPMENT_ONLY": ParamKeyFlag.DEVELOPMENT_ONLY,
-  "CLEAR_ON_IGNITION_ON": ParamKeyFlag.CLEAR_ON_IGNITION_ON,
-  "BACKUP": ParamKeyFlag.BACKUP,
-  "ALL": ParamKeyFlag.ALL,
+  "PERSISTENT": ParamKeyType.PERSISTENT,
+  "CLEAR_ON_MANAGER_START": ParamKeyType.CLEAR_ON_MANAGER_START,
+  "CLEAR_ON_ONROAD_TRANSITION": ParamKeyType.CLEAR_ON_ONROAD_TRANSITION,
+  "CLEAR_ON_OFFROAD_TRANSITION": ParamKeyType.CLEAR_ON_OFFROAD_TRANSITION,
+  "DONT_LOG": ParamKeyType.DONT_LOG,
+  "DEVELOPMENT_ONLY": ParamKeyType.DEVELOPMENT_ONLY,
+  "CLEAR_ON_IGNITION_ON": ParamKeyType.CLEAR_ON_IGNITION_ON,
+  "BACKUP": ParamKeyType.BACKUP,
+  "ALL": ParamKeyType.ALL,
 }
 
 # Map parameter types to ParamKeyType enum
